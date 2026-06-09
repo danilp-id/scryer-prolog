@@ -71,6 +71,7 @@ Some things that are still missing:
 :- meta_predicate(http_basic_auth(:, :, ?, ?)).
 
 :- use_module(library(charsio)).
+:- use_module(library(clpz)).
 :- use_module(library(crypto)).
 :- use_module(library(error)).
 :- use_module(library(format)).
@@ -125,21 +126,22 @@ http_answer_(ResponseHandle, Code, Headers, ResponseStream) :-
     '$http_answer'(ResponseHandle, Code, Headers, ResponseStream).
 
 http_listen_(Port, Handlers, Options) :-
-    parse_options(Options, TLSKey, TLSCert, ContentLengthLimit),
+    parse_options(Options, TLSKey, TLSCert, ContentLengthLimit, InitialState),
     phrase(format_("0.0.0.0:~d", [Port]), Addr),
     setup_call_cleanup(
         (
             http_listen__(Addr, HttpListener, TLSKey, TLSCert, ContentLengthLimit),
             format("Listening at http://~s\n", [Addr])
         ),
-        http_loop(HttpListener, Handlers),
+        http_loop(HttpListener, Handlers, InitialState),
         http_listen_stop_(HttpListener)
     ).
 
-parse_options(Options, TLSKey, TLSCert, ContentLengthLimit) :-
+parse_options(Options, TLSKey, TLSCert, ContentLengthLimit, InitialState) :-
     member_option_default(tls_key, Options, "", TLSKey),
     member_option_default(tls_cert, Options, "", TLSCert),
     member_option_default(content_length_limit, Options, 32768, ContentLengthLimit),
+    member_option_default(initial_state, Options, [], InitialState),
     must_be(integer, ContentLengthLimit).
 
 member_option_default(Key, List, _Default, Value) :-
@@ -149,7 +151,45 @@ member_option_default(Key, List, Default, Default) :-
     X =.. [Key, _],
     \+ member(X, List).
 
-http_loop(HttpListener, Handlers) :-
+call_(Module:Handler, HttpRequest, HttpResponse, State0, State) :-
+    nl,write(Handler),nl,
+    Handler =.. [Name | Args],
+    length(Args, Arity0),
+    write([1, Handler, Name, Arity0]),nl,
+    Arity #= Arity0 + 4,
+    write(Module:Name/Arity),nl,
+    current_predicate(Module:Name/Arity),
+    call(Module:Handler, HttpRequest, HttpResponse, State0, State).
+
+call_(Module:Handler, HttpRequest, HttpResponse, State, State) :-
+    nl,write(Handler),nl,
+    Handler =.. [Name | Args],
+    length(Args, Arity0),
+    write([1, Handler, Name, Arity0]),nl,
+    Arity #= Arity0 + 3,
+    write(Module:Name/Arity),nl,
+    current_predicate(Module:Name/Arity),
+    call(Module:Handler, HttpRequest, HttpResponse, State).
+
+call_(Module:Handler, HttpRequest, HttpResponse, State, State) :-
+    nl,write(Handler),nl,
+    Handler =.. [Name | Args],
+    length(Args, Arity0),
+    write([1, Handler, Name, Arity0]),nl,
+    Arity #= Arity0 + 2,
+    write(Module:Name/Arity),nl,
+    current_predicate(Module:Name/Arity),
+    call(Module:Handler, HttpRequest, HttpResponse).
+
+% call_(Handler, HttpRequest, HttpResponse, State, State) :-
+%     Handler =.. [Name, Args],
+%     length(Args, Arity0),
+%     write([2, Handler, _, Arity0]),nl,
+%     Arity #= Arity0 + 2,
+%     current_predicate(Name/Arity),
+%     call(Handler, HttpRequest, HttpResponse).
+
+http_loop(HttpListener, Handlers, State0) :-
     time((
         http_accept_(HttpListener, RequestMethod, RequestPath, RequestHeaders, RequestQuery, RequestStream, ResponseHandle),
         current_time(Time),
@@ -163,7 +203,7 @@ http_loop(HttpListener, Handlers) :-
                 HttpRequest = http_request(RequestHeadersKV, stream(RequestStream), RequestQueries),
                 HttpResponse = http_response(_, _, _),
                 catch(
-                    (call(Handler, HttpRequest, HttpResponse) ->
+                    (call_(Handler, HttpRequest, HttpResponse, State0, State) ->
                         send_response(ResponseHandle, HttpResponse)
                     ;
                         setup_call_cleanup(
@@ -171,7 +211,7 @@ http_loop(HttpListener, Handlers) :-
                             format(ResponseStream, "Internal Server Error", []),
                             close(ResponseStream)
                         ),
-                        throw(handler_not_available(Handler, RequestMethod, RequestPath, RequestQuery, RequestHeaders))
+                        call_with_error_context(handler_not_available(Handler, RequestMethod, RequestPath, RequestQuery, RequestHeaders), [])
                     ),
                     HandlerError,
                     (
@@ -192,7 +232,7 @@ http_loop(HttpListener, Handlers) :-
             )
         )
     )),
-    http_loop(HttpListener, Handlers).
+    http_loop(HttpListener, Handlers, State).
 
 send_response(ResponseHandle, http_response(StatusCode0, text(ResponseText), ResponseHeaders0)) :-
     default(StatusCode0, 200, StatusCode),
