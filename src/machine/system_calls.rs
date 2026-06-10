@@ -1486,6 +1486,7 @@ impl Machine {
 
     #[inline(always)]
     pub(crate) fn compile_inline_or_expanded_goal(&mut self) -> CallResult {
+        println!("cioeg bug 1 {}", self.indices.bug());
         let goal = self.deref_register(1);
         let module_name = self.deref_register(4);
 
@@ -1503,6 +1504,7 @@ impl Machine {
             key: PredicateKey,
             supp_vars: IndexSet<HeapCellValue, BuildHasherDefault<FxHasher>>,
         }
+        println!("cioeg bug 2 {}", self.indices.bug());
 
         let result = read_heap_cell!(goal,
             (HeapCellValueTag::Str, s) => {
@@ -1614,37 +1616,49 @@ impl Machine {
                 return Ok(());
             }
         );
+        println!("cioeg bug 3 {}", self.indices.bug());
 
         if result.key.0 == atom!(":") {
             self.machine_st.fail = true;
             return Ok(());
         }
+        println!("cioeg bug 3.1 {}", self.indices.bug());
 
         let expanded_term = if result.is_simple_goal {
-            let idx = self.get_or_insert_qualified_code_index(module_name, result.key);
+            println!("cioeg bug 3.2 {}", self.indices.bug());
+            //let idx = self.get_or_insert_qualified_code_index(module_name, result.key); // <-- BUG HERE
+            let idx = self.get_qualified_code_index(module_name, result.key);
+            println!("cioeg bug 3.2.1 {}", self.indices.bug());
             self.machine_st.heap[result.index_ptr_loc] = HeapCellValue::from(idx);
+            println!("cioeg bug 3.3 {}", self.indices.bug());
             result.goal
         } else {
+            println!("cioeg bug 3.4 {}", self.indices.bug());
             let mut unexpanded_vars = IndexSet::with_hasher(FxBuildHasher::default());
             self.machine_st
                 .variable_set(&mut unexpanded_vars, self.machine_st.registers[5]);
+            println!("cioeg bug 3.5 {}", self.indices.bug());
 
             // all supp_vars must appear later!
             let vars = IndexSet::<HeapCellValue, BuildHasherDefault<FxHasher>>::from_iter(
                 unexpanded_vars.difference(&result.supp_vars).cloned(),
             );
+            println!("cioeg bug 3.6 {}", self.indices.bug());
 
             let vars: Vec<_> = vars
                 .union(&result.supp_vars) // difference + union does not cancel.
                 .map(|v| Term::Var(Cell::default(), VarPtr::from(format!("_{}", v.get_value()))))
                 .collect();
+            println!("cioeg bug 3.7 {}", self.indices.bug());
 
             let helper_clause_loc = self.code.len();
+            println!("cioeg bug 3.8 {}", self.indices.bug());
 
             match self.compile_standalone_clause(temp_v!(1), &vars) {
                 Err(e) => {
                     let err = self.machine_st.session_error(e);
                     let stub = functor_stub(atom!("call"), result.key.1);
+                    println!("cioeg bug 3.9 {}", self.indices.bug());
                     return Err(self.machine_st.error_form(err, stub));
                 }
                 Ok(()) => {
@@ -1653,11 +1667,13 @@ impl Machine {
                         self.machine_st,
                         self.machine_st.heap.reserve(unexpanded_vars.len() + 2)
                     );
+                    println!("cioeg bug 3.10 {}", self.indices.bug());
 
                     let idx = CodeIndex::new(
                         IndexPtr::index(helper_clause_loc),
                         &mut self.machine_st.arena.code_index_tbl,
                     );
+                    println!("cioeg bug 3.11 {}", self.indices.bug());
 
                     writer.write_with(|section| {
                         section.push_cell(HeapCellValue::from(idx));
@@ -1667,17 +1683,21 @@ impl Machine {
                             section.push_cell(value);
                         }
                     });
+                    println!("cioeg bug 3.12 {}", self.indices.bug());
 
                     let anon_str_arity = self.machine_st.heap.cell_len() - h - 2;
                     self.machine_st.heap[h + 1] = atom_as_cell!(atom!("$aux"), anon_str_arity);
+                    println!("cioeg bug 3.13 {}", self.indices.bug());
 
                     str_loc_as_cell!(h + 1)
                 }
             }
         };
+        println!("cioeg bug 4 {}", self.indices.bug());
 
         let truncated_goal = self.machine_st.registers[3];
         unify!(&mut self.machine_st, expanded_term, truncated_goal);
+        println!("cioeg bug end {}", self.indices.bug());
 
         Ok(())
     }
@@ -3972,10 +3992,15 @@ impl Machine {
             return;
         }
 
+        // BUG HERE (indices are updated for some reason)
+        //println!("bug begin");
+        println!("{:?} {:?} {:?}", name, arity, module_name);
+        println!("bug track: {:?}", !self.indices.get_predicate_code_index(atom!("a"), 1, atom!("user")).is_none());
         self.machine_st.fail = self
             .indices
             .get_predicate_code_index(name, arity, module_name)
             .is_none();
+        //println!("bug end");
     }
 
     #[inline(always)]

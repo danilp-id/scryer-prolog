@@ -1,0 +1,48 @@
+b src/machine/dispatch.rs:4062
+
+tui disable
+layout src
+
+machine_indices.rs
+
+// BUG HERE:
+// self.code_dir is modified during call for some reason
+self.code_dir.get(&(name, arity)).cloned()
+
+
+pub(super) code_dir: CodeDir,
+
+pub(crate) type CodeDir = IndexMap<PredicateKey, CodeIndex, FxBuildHasher>;
+
+//
+
+b src/machine/dispatch.rs:4063
+
+
+///
+
+b src/machine/dispatch.rs:4063
+
+b if self.indices.bug()
+
+//
+
+b src/machine/dispatch.rs:1620
+
+///
+
+b src/machine/dispatch.rs:4063
+
+break src/machine/dispatch.rs:1620 if self.indices.bug()
+break src/machine/dispatch.rs:5816 if self.indices.bug()
+break src/machine/dispatch.rs:6051 if self.indices.bug()
+
+
+///
+
+b src/machine/dispatch.rs:4063
+b src/machine/dispatch.rs:5811
+//break src/machine/dispatch.rs:5816 if self.indices.bug()
+//b src/machine/system_calls.rs:1489
+
+p self.indices.bug()

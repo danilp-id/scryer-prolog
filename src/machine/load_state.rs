@@ -682,13 +682,46 @@ impl<'a, LS: LoadState<'a>> Loader<'a, LS> {
     ) -> CodeIndex {
         let code_index_tbl = &mut LS::machine_st(&mut self.payload).arena.code_index_tbl;
 
+        println!("get_or_insert_qualified_code_index bug 1 {}", self.wam_prelude.indices.bug());
         if module_name == atom!("user") {
+            //println!("get_or_insert_qualified_code_index user");
             *self
                 .wam_prelude
                 .indices
                 .code_dir
                 .entry(key)
                 .or_insert_with(|| CodeIndex::new(IndexPtr::undefined(), code_index_tbl))
+            // if let Some(ci) = self.wam_prelude.indices.code_dir.get(&key) {
+            //     ci.clone() // requires CodeIndex: Clone
+            // } else {
+            //     CodeIndex::new(IndexPtr::undefined(), code_index_tbl)
+            // }
+        } else {
+            self.get_or_insert_local_code_index(module_name, key)
+        }
+    }
+
+    pub(super) fn get_qualified_code_index(
+        &mut self,
+        module_name: Atom,
+        key: PredicateKey,
+    ) -> CodeIndex {
+        let code_index_tbl = &mut LS::machine_st(&mut self.payload).arena.code_index_tbl;
+
+        println!("get_or_insert_qualified_code_index bug 1 {}", self.wam_prelude.indices.bug());
+        if module_name == atom!("user") {
+            //println!("get_or_insert_qualified_code_index user");
+            // *self
+            //     .wam_prelude
+            //     .indices
+            //     .code_dir
+            //     .entry(key)
+            //     .or_insert_with(|| CodeIndex::new(IndexPtr::undefined(), code_index_tbl))
+            if let Some(ci) = self.wam_prelude.indices.code_dir.get(&key) {
+                ci.clone() // requires CodeIndex: Clone
+            } else {
+                CodeIndex::new(IndexPtr::undefined(), code_index_tbl)
+            }
         } else {
             self.get_or_insert_local_code_index(module_name, key)
         }

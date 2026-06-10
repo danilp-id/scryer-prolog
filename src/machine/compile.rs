@@ -2286,6 +2286,22 @@ impl Machine {
         loader.get_or_insert_qualified_code_index(module_name, key)
     }
 
+    pub(crate) fn get_qualified_code_index(
+        &mut self,
+        module_name: HeapCellValue,
+        key: PredicateKey,
+    ) -> CodeIndex {
+        let mut loader: Loader<'_, InlineLoadState<'_>> = Loader::new(self, InlineTermStream {});
+
+        let module_name = if module_name.get_tag() == HeapCellValueTag::Atom {
+            cell_as_atom!(module_name)
+        } else {
+            atom!("user")
+        };
+
+        loader.get_qualified_code_index(module_name, key)
+    }
+
     pub(crate) fn compile_standalone_clause(
         &mut self,
         term_loc: RegType,

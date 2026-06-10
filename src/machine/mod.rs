@@ -244,6 +244,7 @@ impl Machine {
         module_name: Atom,
         key: PredicateKey,
     ) -> std::process::ExitCode {
+        println!("rmp 1 bug track: {:?}", !self.indices.get_predicate_code_index(atom!("a"), 1, atom!("user")).is_none());
         if let Some(module) = self.indices.modules.get(&module_name) {
             if let Some(code_idx) = module.code_dir.get(&key) {
                 let index_ptr = self
@@ -252,6 +253,7 @@ impl Machine {
                     .code_index_tbl
                     .get_entry(code_idx.into());
                 let p = index_ptr.local().unwrap();
+                println!("rmp 2 bug track: {:?}", !self.indices.get_predicate_code_index(atom!("a"), 1, atom!("user")).is_none());
 
                 // Leave a halting choice point to backtrack to in case the predicate fails or throws.
                 if self.allocate_stub_choice_point().is_err() {
@@ -260,7 +262,7 @@ impl Machine {
 
                 self.machine_st.cp = BREAK_FROM_DISPATCH_LOOP_LOC;
                 self.machine_st.p = p;
-
+                println!("rmp 3 bug track: {:?}", !self.indices.get_predicate_code_index(atom!("a"), 1, atom!("user")).is_none());
                 return self.dispatch_loop();
             }
         }
@@ -1100,8 +1102,10 @@ impl Machine {
                     .arena
                     .code_index_tbl
                     .get_entry(offset.into());
+                println!("3a bug track: {:?}", !self.indices.get_predicate_code_index(atom!("a"), 1, atom!("user")).is_none());
                 self.try_execute(name, arity, index_ptr)
             } else {
+                println!("3b bug track: {:?}", !self.indices.get_predicate_code_index(atom!("a"), 1, atom!("user")).is_none());
                 self.undefined_procedure(name, arity)
             }
         } else if let Some(module) = self.indices.modules.get(&module_name) {
@@ -1133,12 +1137,14 @@ impl Machine {
 
     #[inline(always)]
     fn call_n(&mut self, module_name: Atom, arity: usize) -> CallResult {
+        println!("call_n");
         let key = self.machine_st.setup_call_n(arity)?;
         self.call_clause(module_name, key)
     }
 
     #[inline(always)]
     fn execute_n(&mut self, module_name: Atom, arity: usize) -> CallResult {
+        println!("execute_n");
         let key = self.machine_st.setup_call_n(arity)?;
         self.execute_clause(module_name, key)
     }

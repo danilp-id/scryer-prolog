@@ -1615,6 +1615,7 @@ impl Machine {
 
     pub(super) fn dispatch_loop(&mut self) -> std::process::ExitCode {
         let mut interrupt_counter = std::num::Wrapping(0u8);
+        let mut prev_inst;
         'outer: loop {
             loop {
                 interrupt_counter += 1;
@@ -1626,6 +1627,8 @@ impl Machine {
                     // a separate function marked #[cold] to make the compiler/branch-predictor prefer the happy path
                     handle_code_index_oob(self.code.len(), self.machine_st.p);
                 };
+
+                prev_inst = inst;
 
                 match inst {
                     &Instruction::BreakFromDispatchLoop => {
@@ -4041,6 +4044,7 @@ impl Machine {
                         step_or_fail!(self.machine_st, self.machine_st.p = self.machine_st.cp);
                     }
                     &Instruction::CallDynamicModuleResolution(arity) => {
+                        println!("CallDynamicModuleResolution");
                         // DEBUG: bug not here
                         // let (module_name, key) = try_or_throw!(
                         //     self.machine_st,
@@ -4059,12 +4063,16 @@ impl Machine {
                         }
                     }
                     &Instruction::ExecuteDynamicModuleResolution(arity) => {
+                        println!("ExecuteDynamicModuleResolution");
+                        println!("1 bug track: {:?}", !self.indices.get_predicate_code_index(atom!("a"), 1, atom!("user")).is_none());
+
                         let (module_name, key) = try_or_throw!(
                             self.machine_st,
                             // DEBUG: bug here???
                             self.dynamic_module_resolution(arity - 2),
                             continue
                         );
+                        println!("2 bug track: {:?}", self.indices.bug());
 
                         //println!("{:?} {:?}", module_name, key);
                         try_or_throw!(
@@ -4072,6 +4080,8 @@ impl Machine {
                             self.execute_clause(module_name, key),
                             continue
                         );
+                        println!("dispatch_loop end bug track: {:?}", !self.indices.get_predicate_code_index(atom!("a"), 1, atom!("user")).is_none());
+
 
                         if self.machine_st.fail {
                             self.machine_st.backtrack();
@@ -5798,12 +5808,15 @@ impl Machine {
                         step_or_fail!(self.machine_st, self.machine_st.p = self.machine_st.cp);
                     }
                     &Instruction::CallCompileInlineOrExpandedGoal => {
+                        println!("CallCompileInlineOrExpandedGoal 1 bug track: {:?}", self.indices.bug());
                         try_or_throw!(
                             self.machine_st,
-                            self.compile_inline_or_expanded_goal(),
+                            self.compile_inline_or_expanded_goal(), // <-- BUG HERE
                             continue
                         );
+                        println!("CallCompileInlineOrExpandedGoal 2 bug track: {:?}", self.indices.bug());
                         step_or_fail!(self.machine_st, self.machine_st.p += 1);
+                        println!("CallCompileInlineOrExpandedGoal 3 bug track: {:?}", self.indices.bug());
                     }
                     &Instruction::ExecuteCompileInlineOrExpandedGoal => {
                         try_or_throw!(

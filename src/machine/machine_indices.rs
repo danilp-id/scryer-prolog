@@ -392,6 +392,10 @@ impl IndexStore {
         }
     }
 
+    pub(crate) fn bug(&self) -> bool {
+        return !self.get_predicate_code_index(atom!("a"), 1, atom!("user")).is_none();
+    }
+
     pub(crate) fn get_predicate_code_index(
         &self,
         name: Atom,
@@ -402,8 +406,13 @@ impl IndexStore {
         if module == atom!("user") {
             //println!("get_predicate_code_index user");
             //println!("{:?}", self.code_dir);
+
+            // BUG HERE:
+            // self.code_dir is modified during call for some reason
+            //println!("{:?} {:?}", name, arity);
             self.code_dir.get(&(name, arity)).cloned()
         } else {
+            //println!("get_predicate_code_index else");
             self.modules
                 .get(&module)
                 .and_then(|module| module.code_dir.get(&(name, arity)).cloned())
