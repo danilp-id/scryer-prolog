@@ -1321,6 +1321,7 @@ abolish(Pred) :-
 current_predicate(Pred) :-
     (  var(Pred) ->
        '$get_db_refs'(_, _, _, PIs),
+       %nl,write([1,PIs]),nl,
        lists:member(Pred, PIs)
     ;  loader:strip_module(Pred, Module, UnqualifiedPred),
        UnqualifiedPred = Name/Arity ->

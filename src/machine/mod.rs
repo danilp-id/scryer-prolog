@@ -1029,16 +1029,23 @@ impl Machine {
 
         match idx.tag() {
             IndexPtrTag::DynamicUndefined => {
+                //println!("DynamicUndefined");
                 self.machine_st.fail = true;
             }
             IndexPtrTag::Undefined => {
+                //println!("Undefined");
                 return self.undefined_procedure(name, arity);
             }
             IndexPtrTag::DynamicIndex => {
+                //println!("DynamicIndex");
                 self.machine_st.dynamic_mode = FirstOrNext::First;
                 self.machine_st.execute_at_index(arity, compiled_tl_index);
             }
-            IndexPtrTag::Index => self.machine_st.execute_at_index(arity, compiled_tl_index),
+            IndexPtrTag::Index => {
+                //println!("Index");
+                // HERE???
+                self.machine_st.execute_at_index(arity, compiled_tl_index);
+            }
         }
 
         Ok(())
@@ -1047,8 +1054,10 @@ impl Machine {
     #[inline(always)]
     fn call_clause(&mut self, module_name: Atom, key: PredicateKey) -> CallResult {
         let (name, arity) = key;
+        println!("call_clause");
 
         if module_name == atom!("user") {
+                println!("call_clause user");
             if let Some(idx) = self.indices.code_dir.get(&(name, arity)).cloned() {
                 let index_ptr = self.machine_st.arena.code_index_tbl.get_entry(idx.into());
                 self.try_call(name, arity, index_ptr)
@@ -1056,6 +1065,7 @@ impl Machine {
                 Err(self.machine_st.throw_undefined_error(name, arity))
             }
         } else if let Some(module) = self.indices.modules.get(&module_name) {
+            println!("some module");
             if let Some(idx) = module.code_dir.get(&(name, arity)).cloned() {
                 let index_ptr = self.machine_st.arena.code_index_tbl.get_entry(idx.into());
                 self.try_call(name, arity, index_ptr)
@@ -1063,6 +1073,7 @@ impl Machine {
                 self.undefined_procedure(name, arity)
             }
         } else {
+            println!("else");
             let stub = functor_stub(name, arity);
             let err = self
                 .machine_st
@@ -1078,9 +1089,11 @@ impl Machine {
 
     #[inline(always)]
     fn execute_clause(&mut self, module_name: Atom, key: PredicateKey) -> CallResult {
+        println!("execute_clause");
         let (name, arity) = key;
 
         if module_name == atom!("user") {
+            println!("user");
             if let Some(offset) = self.indices.code_dir.get(&(name, arity)).cloned() {
                 let index_ptr = self
                     .machine_st
@@ -1092,6 +1105,7 @@ impl Machine {
                 self.undefined_procedure(name, arity)
             }
         } else if let Some(module) = self.indices.modules.get(&module_name) {
+            println!("some module");
             if let Some(offset) = module.code_dir.get(&(name, arity)).cloned() {
                 let index_ptr = self
                     .machine_st
@@ -1103,6 +1117,7 @@ impl Machine {
                 self.undefined_procedure(name, arity)
             }
         } else {
+            println!("else");
             let stub = functor_stub(name, arity);
             let err = self
                 .machine_st

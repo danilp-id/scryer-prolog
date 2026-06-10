@@ -263,6 +263,8 @@ impl IndexStore {
 
     #[inline(always)]
     pub(crate) fn goal_expansion_defined(&self, key: PredicateKey, module_name: Atom) -> bool {
+        //println!("goal_expansion_defined");
+        // DEBUG: this one is ok
         let compilation_target = match module_name {
             atom!("user") => CompilationTarget::User,
             _ => CompilationTarget::Module(module_name),
@@ -396,7 +398,10 @@ impl IndexStore {
         arity: usize,
         module: Atom,
     ) -> Option<CodeIndex> {
+        //println!("get_predicate_code_index");
         if module == atom!("user") {
+            //println!("get_predicate_code_index user");
+            //println!("{:?}", self.code_dir);
             self.code_dir.get(&(name, arity)).cloned()
         } else {
             self.modules

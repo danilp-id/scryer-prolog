@@ -1056,6 +1056,7 @@ call(G) :-
     var(G),
     instantiation_error(call/1).
 call(G) :-
+    %nl,write(call/1), nl,
     '$fast_call'(G).
 call(G0) :-
     call_module(G0, M0, G1),

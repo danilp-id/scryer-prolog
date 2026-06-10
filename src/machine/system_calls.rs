@@ -1368,6 +1368,8 @@ impl Machine {
         arity: usize,
         call_at_index: impl Fn(&mut Machine, Atom, usize, IndexPtr) -> CallResult,
     ) -> CallResult {
+        //println!("fast_call");
+        //println!("fast_call {}", self.)
         let load_registers = |machine_st: &mut MachineState,
                               goal: HeapCellValue,
                               goal_arity: usize| {
@@ -1409,6 +1411,7 @@ impl Machine {
                 (name, arity, None)
             }
             _ => {
+                println!("self.machine_st.fail = true;");
                 self.machine_st.fail = true;
                 return Ok(());
             }
@@ -1419,6 +1422,7 @@ impl Machine {
             .quantification_to_module_name(module_quantification)
             .map_err(|err| {
                 let stub = functor_stub(atom!("call"), arity);
+                println!("error {:?}", err);
                 self.machine_st.error_form(err, stub)
             })?;
 
@@ -1444,6 +1448,7 @@ impl Machine {
                     (name, goal_arity) = (inner_name, inner_arity);
                     arity += goal_arity;
 
+                    //println!("get_predicate_code_index");
                     self.indices
                         .get_predicate_code_index(name, arity, module_name)
                 } else {
@@ -1474,6 +1479,7 @@ impl Machine {
             }
         }
 
+        //println!("fall error");
         self.machine_st.fail = true;
         Ok(())
     }
@@ -1720,8 +1726,10 @@ impl Machine {
 
     #[inline(always)]
     pub(crate) fn prepare_call_clause(&mut self, arity: usize) -> CallResult {
+        println!("call_clause");
         let qualified_goal = self.deref_register(2);
 
+        // DEBUG: bug is not below
         // the first two arguments don't belong to the containing call/N.
         let arity = arity - 2;
 
@@ -1731,6 +1739,7 @@ impl Machine {
 
         // assemble goal from pre-loaded (narity) and supplementary
         // (arity) arguments.
+        println!("{:?} {:?}", name, narity);
 
         let target_goal = if arity == 0 {
             qualified_goal
@@ -1771,14 +1780,17 @@ impl Machine {
         &mut self,
         narity: usize,
     ) -> Result<(Atom, PredicateKey), MachineStub> {
+        println!("dynamic_module_resolution");
         let module_name = self.deref_register(1);
 
         let module_name = read_heap_cell!(module_name,
             (HeapCellValueTag::Atom, (name, _arity)) => {
+                println!("Atom");
                 debug_assert_eq!(_arity, 0);
                 name
             }
             (HeapCellValueTag::Str, s) => {
+                println!("Str");
                 let (module_name, _arity) = cell_as_atom_cell!(self.machine_st.heap[s])
                     .get_name_and_arity();
 
@@ -1786,6 +1798,7 @@ impl Machine {
                 module_name
             }
             _ => {
+                println!("other");
                 let goal = self.machine_st.registers[2];
                 let mut functor_writer = Heap::functor_writer(
                     functor!(atom!(":"), [cell(module_name), cell(goal)]),
@@ -1803,30 +1816,33 @@ impl Machine {
             }
         );
 
-        let goal = self.deref_register(2);
+        println!("{:?}", module_name);
 
-        let (name, arity, s) = self.machine_st.setup_call_n_init_goal_info(goal, narity)?;
+        //let goal = self.deref_register(2);
 
-        // TODO: think we just need the 'Greater' branch here.
-        match arity.cmp(&2) {
-            Ordering::Less => {
-                for i in arity + 1..arity + narity + 1 {
-                    self.machine_st.registers[i] = self.machine_st.registers[i + 2 - arity];
-                }
-            }
-            Ordering::Greater => {
-                for i in (arity + 1..arity + narity + 1).rev() {
-                    self.machine_st.registers[i] = self.machine_st.registers[i + 2 - arity];
-                }
-            }
-            Ordering::Equal => {}
-        }
+        //let (name, arity, s) = self.machine_st.setup_call_n_init_goal_info(goal, narity)?;
 
-        let key = (name, arity + narity);
+        // // TODO: think we just need the 'Greater' branch here.
+        // match arity.cmp(&2) {
+        //     Ordering::Less => {
+        //         for i in arity + 1..arity + narity + 1 {
+        //             self.machine_st.registers[i] = self.machine_st.registers[i + 2 - arity];
+        //         }
+        //     }
+        //     Ordering::Greater => {
+        //         for i in (arity + 1..arity + narity + 1).rev() {
+        //             self.machine_st.registers[i] = self.machine_st.registers[i + 2 - arity];
+        //         }
+        //     }
+        //     Ordering::Equal => {}
+        // }
 
-        for i in 1..arity + 1 {
-            self.machine_st.registers[i] = self.machine_st.heap[s + i];
-        }
+        //let key = (name, arity + narity);
+        let key = (module_name, 1);
+
+        // for i in 1..arity + 1 {
+        //     self.machine_st.registers[i] = self.machine_st.heap[s + i];
+        // }
 
         Ok((module_name, key))
     }

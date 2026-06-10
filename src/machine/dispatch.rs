@@ -4041,17 +4041,18 @@ impl Machine {
                         step_or_fail!(self.machine_st, self.machine_st.p = self.machine_st.cp);
                     }
                     &Instruction::CallDynamicModuleResolution(arity) => {
-                        let (module_name, key) = try_or_throw!(
-                            self.machine_st,
-                            self.dynamic_module_resolution(arity - 2),
-                            continue
-                        );
+                        // DEBUG: bug not here
+                        // let (module_name, key) = try_or_throw!(
+                        //     self.machine_st,
+                        //     self.dynamic_module_resolution(arity - 2),
+                        //     continue
+                        // );
 
-                        try_or_throw!(
-                            self.machine_st,
-                            self.call_clause(module_name, key),
-                            continue
-                        );
+                        // try_or_throw!(
+                        //     self.machine_st,
+                        //     self.call_clause(module_name, key),
+                        //     continue
+                        // );
 
                         if self.machine_st.fail {
                             self.machine_st.backtrack();
@@ -4060,10 +4061,12 @@ impl Machine {
                     &Instruction::ExecuteDynamicModuleResolution(arity) => {
                         let (module_name, key) = try_or_throw!(
                             self.machine_st,
+                            // DEBUG: bug here???
                             self.dynamic_module_resolution(arity - 2),
                             continue
                         );
 
+                        //println!("{:?} {:?}", module_name, key);
                         try_or_throw!(
                             self.machine_st,
                             self.execute_clause(module_name, key),

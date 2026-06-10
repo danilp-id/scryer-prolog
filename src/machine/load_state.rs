@@ -158,6 +158,7 @@ pub(super) fn import_module_exports<'a, LS: LoadState<'a>>(
                         .get_entry(src_code_index.into())
                         .is_dynamic_undefined()
                     {
+                        println!("import_module_exports");
                         code_dir.insert(key, src_code_index);
                     }
                 } else {

@@ -1,0 +1,16 @@
+?- p(1).
+goal_expansion_defined
+get_predicate_code_index
+fall error
+get_predicate_code_index
+get_predicate_code_index
+get_predicate_code_index
+goal_expansion_defined
+get_predicate_code_index
+   get_predicate_code_index
+get_predicate_code_index
+get_predicate_code_index
+get_predicate_code_index
+error(existence_error(procedure,p/1),p/1).
+
+

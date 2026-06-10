@@ -2231,6 +2231,7 @@ impl<'a, LS: LoadState<'a>> Loader<'a, LS> {
                         .get_entry(offset.into());
 
                     let offset = *module.code_dir.entry(key).or_insert(offset);
+                    //println!("compile_and_submit {:?} {:?}", key, offset);
 
                     set_code_index::<LS>(
                         &mut self.payload,

@@ -712,6 +712,7 @@ impl<'a, LS: LoadState<'a>> Loader<'a, LS> {
                     if let Some(ref mut module) =
                         self.wam_prelude.indices.modules.get_mut(&module_name)
                     {
+                        println!("AddedModulePredicate");
                         module.code_dir.swap_remove(&key);
                     }
                 }
@@ -719,6 +720,7 @@ impl<'a, LS: LoadState<'a>> Loader<'a, LS> {
                     if let Some(ref mut module) =
                         self.wam_prelude.indices.modules.get_mut(&module_name)
                     {
+                        println!("ReplacedModulePredicate");
                         if let Some(code_idx) = module.code_dir.get_mut(&key) {
                             let code_index_tbl =
                                 &mut LS::machine_st(&mut self.payload).arena.code_index_tbl;
@@ -739,9 +741,11 @@ impl<'a, LS: LoadState<'a>> Loader<'a, LS> {
                     op_decl.insert_into_op_dir(&mut self.wam_prelude.indices.op_dir);
                 }
                 RetractionRecord::AddedUserPredicate(key) => {
+                    println!("AddedUserPredicate");
                     self.wam_prelude.indices.code_dir.swap_remove(&key);
                 }
                 RetractionRecord::ReplacedUserPredicate(key, old_code_idx) => {
+                    println!("ReplacedUserPredicate");
                     if let Some(code_idx) = self.wam_prelude.indices.code_dir.get_mut(&key) {
                         let code_index_tbl =
                             &mut LS::machine_st(&mut self.payload).arena.code_index_tbl;
