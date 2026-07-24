@@ -151,33 +151,27 @@ member_option_default(Key, List, Default, Default) :-
     X =.. [Key, _],
     \+ member(X, List).
 
+% there exists a match that modifies a state
 call_(Module:Handler, HttpRequest, HttpResponse, State0, State) :-
-    nl,write(Handler),nl,
     Handler =.. [Name | Args],
     length(Args, Arity0),
-    write([1, Handler, Name, Arity0]),nl,
     Arity #= Arity0 + 4,
-    write(Module:Name/Arity),nl,
     current_predicate(Module:Name/Arity),
     call(Module:Handler, HttpRequest, HttpResponse, State0, State).
 
+% there exists a match that sets a new state, ignoring old state
 call_(Module:Handler, HttpRequest, HttpResponse, State, State) :-
-    nl,write(Handler),nl,
     Handler =.. [Name | Args],
     length(Args, Arity0),
-    write([1, Handler, Name, Arity0]),nl,
     Arity #= Arity0 + 3,
-    write(Module:Name/Arity),nl,
     current_predicate(Module:Name/Arity),
     call(Module:Handler, HttpRequest, HttpResponse, State).
 
+% there exists a match not touching the state
 call_(Module:Handler, HttpRequest, HttpResponse, State, State) :-
-    nl,write(Handler),nl,
     Handler =.. [Name | Args],
     length(Args, Arity0),
-    write([1, Handler, Name, Arity0]),nl,
     Arity #= Arity0 + 2,
-    write(Module:Name/Arity),nl,
     current_predicate(Module:Name/Arity),
     call(Module:Handler, HttpRequest, HttpResponse).
 
