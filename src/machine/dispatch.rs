@@ -292,11 +292,8 @@ impl MachineState {
     }
 
     #[inline(always)]
-    pub(crate) fn check_for_interrupt(&mut self) -> bool {
+    pub(crate) fn check_for_interrupt(&mut self, stub: impl FnOnce() -> MachineStub) -> CallResult {
         if INTERRUPT.swap(false, atomic::Ordering::Relaxed) {
-            self.throw_interrupt_exception();
-            self.backtrack();
-
             // We have extracted control over the Tokio runtime to the calling context for enabling library use case
             // (see https://github.com/mthom/scryer-prolog/pull/1880)
             // So we only have access to a runtime handle in here and can't shut it down.
@@ -313,9 +310,11 @@ impl MachineState {
 
             //let old_runtime = tokio::runtime::Handle::current();
             //old_runtime.shutdown_background();
-            true
+
+            let err = self.interrupt_error();
+            Err(self.error_form(err, stub()))
         } else {
-            false
+            Ok(())
         }
     }
 
@@ -1599,7 +1598,13 @@ impl Machine {
                 }
             }
 
-            self.machine_st.check_for_interrupt();
+            if let Err(err) = self
+                .machine_st
+                .check_for_interrupt(|| functor_stub(atom!("repl"), 0))
+            {
+                self.machine_st.throw_exception(err);
+                self.machine_st.backtrack();
+            }
         }
 
         Some(std::process::ExitCode::SUCCESS)
@@ -6033,7 +6038,13 @@ impl Machine {
                 }
             }
 
-            self.machine_st.check_for_interrupt();
+            if let Err(err) = self
+                .machine_st
+                .check_for_interrupt(|| functor_stub(atom!("dispatch_loop"), 0))
+            {
+                self.machine_st.throw_exception(err);
+                self.machine_st.backtrack();
+            };
         }
 
         std::process::ExitCode::SUCCESS
