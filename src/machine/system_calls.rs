@@ -6957,7 +6957,8 @@ impl Machine {
             std::thread::sleep(step);
             remaining -= step;
 
-            if self.interrupt_occured() {
+            if self.machine_st.check_for_interrupt() {
+                // FIXME check_for_interrupt already throws an interrupt error
                 let err = self.machine_st.interrupt_error();
                 let src = functor_stub(atom!("repl"), 0);
                 return Err(self.machine_st.error_form(err, src));
