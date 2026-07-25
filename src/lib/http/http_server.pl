@@ -155,33 +155,18 @@ member_option_default(Key, List, Default, Default) :-
 call_(Module:Handler, HttpRequest, HttpResponse, State0, State) :-
     Handler =.. [Name | Args],
     length(Args, Arity0),
-    Arity #= Arity0 + 4,
     current_predicate(Module:Name/Arity),
-    call(Module:Handler, HttpRequest, HttpResponse, State0, State).
+    NumExtraParams #= Arity - Arity0 - 2,
+    call_extra_params_(NumExtraParams, Module:Handler, HttpRequest, HttpResponse, State0, State).
 
-% there exists a match that sets a new state, ignoring old state
-call_(Module:Handler, HttpRequest, HttpResponse, State, State) :-
-    Handler =.. [Name | Args],
-    length(Args, Arity0),
-    Arity #= Arity0 + 3,
-    current_predicate(Module:Name/Arity),
-    call(Module:Handler, HttpRequest, HttpResponse, State).
-
-% there exists a match not touching the state
-call_(Module:Handler, HttpRequest, HttpResponse, State, State) :-
-    Handler =.. [Name | Args],
-    length(Args, Arity0),
-    Arity #= Arity0 + 2,
-    current_predicate(Module:Name/Arity),
+call_extra_params_(0, Module:Handler, HttpRequest, HttpResponse, State, State) :-
     call(Module:Handler, HttpRequest, HttpResponse).
 
-% call_(Handler, HttpRequest, HttpResponse, State, State) :-
-%     Handler =.. [Name, Args],
-%     length(Args, Arity0),
-%     write([2, Handler, _, Arity0]),nl,
-%     Arity #= Arity0 + 2,
-%     current_predicate(Name/Arity),
-%     call(Handler, HttpRequest, HttpResponse).
+call_extra_params_(1, Module:Handler, HttpRequest, HttpResponse, _, State) :-
+    call(Module:Handler, HttpRequest, HttpResponse, State).
+
+call_extra_params_(2, Module:Handler, HttpRequest, HttpResponse, State0, State) :-
+    call(Module:Handler, HttpRequest, HttpResponse, State0, State).
 
 http_loop(HttpListener, Handlers, State0) :-
     time((
