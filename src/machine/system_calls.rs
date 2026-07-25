@@ -4737,92 +4737,93 @@ impl Machine {
         let stream_addr = self.deref_register(6);
         let handle_addr = self.deref_register(7);
         read_heap_cell!(culprit,
-        (HeapCellValueTag::Cons, cons_ptr) => {
-        match_untyped_arena_ptr!(cons_ptr,
-            (ArenaHeaderTag::HttpListener, http_listener) => {
-            loop {
-                match http_listener.incoming.recv_timeout(std::time::Duration::from_millis(200)) {
-                    Ok(request) => {
-                        let method_atom = match request.request_data.method {
-                            Method::GET => atom!("get"),
-                            Method::POST => atom!("post"),
-                            Method::PUT => atom!("put"),
-                            Method::DELETE => atom!("delete"),
-                            Method::PATCH => atom!("patch"),
-                            Method::HEAD => atom!("head"),
-                            Method::OPTIONS => atom!("options"),
-                            Method::TRACE => atom!("trace"),
-                            Method::CONNECT => atom!("connect"),
-                            _ => atom!("unsupported_extension"),
-                        };
+            (HeapCellValueTag::Cons, cons_ptr) => {
+                match_untyped_arena_ptr!(cons_ptr,
+                    (ArenaHeaderTag::HttpListener, http_listener) => {
+                        loop {
+                            match http_listener.incoming.recv_timeout(std::time::Duration::from_millis(200)) {
+                                Ok(request) => {
+                                    let method_atom = match request.request_data.method {
+                                        Method::GET => atom!("get"),
+                                        Method::POST => atom!("post"),
+                                        Method::PUT => atom!("put"),
+                                        Method::DELETE => atom!("delete"),
+                                        Method::PATCH => atom!("patch"),
+                                        Method::HEAD => atom!("head"),
+                                        Method::OPTIONS => atom!("options"),
+                                        Method::TRACE => atom!("trace"),
+                                        Method::CONNECT => atom!("connect"),
+                                        _ => atom!("unsupported_extension"),
+                                    };
 
-                        let path_atom = AtomTable::build_with(&self.machine_st.atom_tbl, &request.request_data.path);
-                        let path_cell = resource_error_call_result!(
-                            self.machine_st,
-                            self.machine_st.heap.allocate_cstr(&request.request_data.path)
-                        );
+                                    let path_atom = AtomTable::build_with(&self.machine_st.atom_tbl, &request.request_data.path);
+                                    let path_cell = resource_error_call_result!(
+                                        self.machine_st,
+                                        self.machine_st.heap.allocate_cstr(&request.request_data.path)
+                                    );
 
-                        let mut headers = vec![];
+                                    let mut headers = vec![];
 
-                        for (header_name, header_value) in request.request_data.headers {
-                            let header_value = resource_error_call_result!(
-                                self.machine_st,
-                                self.machine_st.heap.allocate_cstr(header_value.to_str().unwrap())
-                            );
+                                    for (header_name, header_value) in request.request_data.headers {
+                                        let header_value = resource_error_call_result!(
+                                            self.machine_st,
+                                            self.machine_st.heap.allocate_cstr(header_value.to_str().unwrap())
+                                        );
 
-                            let header_term = functor!(
-                                AtomTable::build_with(&self.machine_st.atom_tbl, header_name.unwrap().as_str()),
-                                [cell(header_value)]
-                            );
+                                        let header_term = functor!(
+                                            AtomTable::build_with(&self.machine_st.atom_tbl, header_name.unwrap().as_str()),
+                                            [cell(header_value)]
+                                        );
 
-                            let mut functor_writer = Heap::functor_writer(header_term);
+                                        let mut functor_writer = Heap::functor_writer(header_term);
 
-                            let functor_cell = resource_error_call_result!(
-                                self.machine_st,
-                                functor_writer(&mut self.machine_st.heap)
-                            );
+                                        let functor_cell = resource_error_call_result!(
+                                            self.machine_st,
+                                            functor_writer(&mut self.machine_st.heap)
+                                        );
 
-                            headers.push(functor_cell);
-                        }
+                                        headers.push(functor_cell);
+                                    }
 
-                        let headers_list_cell = resource_error_call_result!(
-                            self.machine_st,
-                            sized_iter_to_heap_list(
-                                &mut self.machine_st.heap,
-                                headers.len(),
-                                headers.into_iter(),
-                            )
-                        );
+                                    let headers_list_cell = resource_error_call_result!(
+                                        self.machine_st,
+                                        sized_iter_to_heap_list(
+                                            &mut self.machine_st.heap,
+                                            headers.len(),
+                                            headers.into_iter(),
+                                        )
+                                    );
 
-                        let query_str  = request.request_data.query;
-                        let query_cell = resource_error_call_result!(
-                            self.machine_st,
-                            self.machine_st.heap.allocate_cstr(&query_str)
-                        );
+                                    let query_str  = request.request_data.query;
+                                    let query_cell = resource_error_call_result!(
+                                        self.machine_st,
+                                        self.machine_st.heap.allocate_cstr(&query_str)
+                                    );
 
-                        let mut stream = Stream::from_http_stream(
-                            path_atom,
-                            request.request_data.body,
-                            &mut self.machine_st.arena
-                        );
-                        *stream.options_mut() = StreamOptions::default();
-                        stream.options_mut().set_stream_type(StreamType::Binary);
+                                    let mut stream = Stream::from_http_stream(
+                                        path_atom,
+                                        request.request_data.body,
+                                        &mut self.machine_st.arena
+                                    );
+                                    *stream.options_mut() = StreamOptions::default();
+                                    stream.options_mut().set_stream_type(StreamType::Binary);
 
-                        self.indices.add_stream(stream, atom!("http_accept"), 7)
-                            .map_err(|stub_gen| stub_gen(&mut self.machine_st))?;
+                                    self.indices.add_stream(stream, atom!("http_accept"), 7)
+                                        .map_err(|stub_gen| stub_gen(&mut self.machine_st))?;
 
-                        let stream = stream_as_cell!(stream);
+                                    let stream = stream_as_cell!(stream);
 
-                        let handle = arena_alloc!(request.response, &mut self.machine_st.arena)
-                            as TypedArenaPtr<HttpResponse>;
+                                    let handle = arena_alloc!(request.response, &mut self.machine_st.arena)
+                                        as TypedArenaPtr<HttpResponse>;
 
-                        self.machine_st.bind(method.as_var().unwrap(), atom_as_cell!(method_atom));
-                        self.machine_st.bind(path.as_var().unwrap(), path_cell);
-                        unify!(self.machine_st, headers_list_cell, self.machine_st.registers[4]);
-                        self.machine_st.bind(query.as_var().unwrap(), query_cell);
-                        self.machine_st.bind(stream_addr.as_var().unwrap(), stream);
-                        self.machine_st.bind(handle_addr.as_var().unwrap(), typed_arena_ptr_as_cell!(handle));
+                                    self.machine_st.bind(method.as_var().unwrap(), atom_as_cell!(method_atom));
+                                    self.machine_st.bind(path.as_var().unwrap(), path_cell);
+                                    unify!(self.machine_st, headers_list_cell, self.machine_st.registers[4]);
+                                    self.machine_st.bind(query.as_var().unwrap(), query_cell);
+                                    self.machine_st.bind(stream_addr.as_var().unwrap(), stream);
+                                    self.machine_st.bind(handle_addr.as_var().unwrap(), typed_arena_ptr_as_cell!(handle));
 
+<<<<<<< HEAD
                         break
                     }
                     Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
@@ -4838,18 +4839,24 @@ impl Machine {
                             //self.machine_st.fail = true;
                             //break;
                             //break;
+=======
+                                    break
+                                }
+                                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                                    self.machine_st.check_for_interrupt(|| functor_stub(atom!("http_accept"), 7))?;
+                                }
+                            Err(_) => {
+                                self.machine_st.fail = true;
+                            }
+>>>>>>> 16fd9e8e (fix check_for_interrupt fixme)
                         }
                     }
-                  Err(_) => {
-                      self.machine_st.fail = true;
-                  }
                 }
-            }
-            }
-            _ => {
-                    unreachable!();
+                _ => {
+                        unreachable!();
+
                 }
-            );
+                );
             }
             _ => {
                 unreachable!();
@@ -6967,12 +6974,8 @@ impl Machine {
             std::thread::sleep(step);
             remaining -= step;
 
-            if self.machine_st.check_for_interrupt() {
-                // FIXME check_for_interrupt already throws an interrupt error
-                let err = self.machine_st.interrupt_error();
-                let src = functor_stub(atom!("repl"), 0);
-                return Err(self.machine_st.error_form(err, src));
-            }
+            self.machine_st
+                .check_for_interrupt(|| functor_stub(atom!("sleep"), 1))?;
         }
 
         Ok(())
@@ -7218,9 +7221,7 @@ impl Machine {
                              }
                             Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
                                 std::thread::sleep(std::time::Duration::from_millis(200));
-                                if self.machine_st.check_for_interrupt() {
-                                    break;
-                                }
+                                self.machine_st.check_for_interrupt(|| functor_stub(atom!("socket_server_accept"), 4))?;
                             }
                             Err(_) => {
                                 println!("IO error");
