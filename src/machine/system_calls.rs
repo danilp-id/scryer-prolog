@@ -3932,7 +3932,7 @@ impl Machine {
     }
 
     fn parse_module_name(module_name: HeapCellValue) -> Atom {
-        return read_heap_cell!(module_name,
+        read_heap_cell!(module_name,
             (HeapCellValueTag::Atom, (module_name, _arity)) => {
                 module_name
             }
@@ -3942,7 +3942,7 @@ impl Machine {
             _ => {
                 unreachable!()
             }
-        );
+        )
     }
 
     fn user_predicate_exists(&self, name: Atom, arity: usize, module_name: Atom) -> bool {
@@ -3963,7 +3963,7 @@ impl Machine {
 
             return !index_ptr.is_undefined();
         };
-        return false;
+        false
     }
 
     #[inline(always)]
@@ -4411,27 +4411,24 @@ impl Machine {
         }
         let stub_gen = || functor_stub(atom!("http_open"), 3);
 
-        let headers = match self
-            .machine_st
-            .try_from_list(self.machine_st.registers[7], stub_gen)
-        {
-            Ok(addrs) => {
-                let mut header_map = HeaderMap::new();
-                for heap_cell in addrs {
-                    read_heap_cell!(heap_cell,
-                        (HeapCellValueTag::Str, s) => {
-                            let name = cell_as_atom_cell!(self.machine_st.heap[s]).get_name();
-                            let value = self.machine_st.value_to_str_like(self.machine_st.heap[s + 1]).unwrap();
-                            header_map.insert(HeaderName::from_str(&name.as_str()).unwrap(), HeaderValue::from_str(&value.as_str()).unwrap());
-                        }
-                        _ => {
-                            unreachable!()
-                        }
-                    )
-                }
-                header_map
+        let headers = {
+            let addrs = self
+                .machine_st
+                .try_from_list(self.machine_st.registers[7], stub_gen)?;
+            let mut header_map = HeaderMap::new();
+            for heap_cell in addrs {
+                read_heap_cell!(heap_cell,
+                    (HeapCellValueTag::Str, s) => {
+                        let name = cell_as_atom_cell!(self.machine_st.heap[s]).get_name();
+                        let value = self.machine_st.value_to_str_like(self.machine_st.heap[s + 1]).unwrap();
+                        header_map.insert(HeaderName::from_str(&name.as_str()).unwrap(), HeaderValue::from_str(&value.as_str()).unwrap());
+                    }
+                    _ => {
+                        unreachable!()
+                    }
+                )
             }
-            Err(e) => return Err(e),
+            header_map
         };
         if let Some(address_sink) = self.machine_st.value_to_str_like(address_sink) {
             let address_string = address_sink.as_str(); //to_string();
@@ -4886,27 +4883,24 @@ impl Machine {
             _ => unreachable!(),
         };
         let stub_gen = || functor_stub(atom!("http_listen"), 2);
-        let headers = match self
-            .machine_st
-            .try_from_list(self.machine_st.registers[3], stub_gen)
-        {
-            Ok(addrs) => {
-                let mut header_map = HeaderMap::new();
-                for heap_cell in addrs {
-                    read_heap_cell!(heap_cell,
-                        (HeapCellValueTag::Str, s) => {
-                            let name = cell_as_atom_cell!(self.machine_st.heap[s]).get_name();
-                            let value = self.machine_st.value_to_str_like(self.machine_st.heap[s + 1]).unwrap();
-                            header_map.insert(HeaderName::from_str(&name.as_str()).unwrap(), HeaderValue::from_str(&value.as_str()).unwrap());
-                        }
-                        _ => {
-                            unreachable!()
-                        }
-                    )
-                }
-                header_map
+        let headers = {
+            let addrs = self
+                .machine_st
+                .try_from_list(self.machine_st.registers[3], stub_gen)?;
+            let mut header_map = HeaderMap::new();
+            for heap_cell in addrs {
+                read_heap_cell!(heap_cell,
+                    (HeapCellValueTag::Str, s) => {
+                        let name = cell_as_atom_cell!(self.machine_st.heap[s]).get_name();
+                        let value = self.machine_st.value_to_str_like(self.machine_st.heap[s + 1]).unwrap();
+                        header_map.insert(HeaderName::from_str(&name.as_str()).unwrap(), HeaderValue::from_str(&value.as_str()).unwrap());
+                    }
+                    _ => {
+                        unreachable!()
+                    }
+                )
             }
-            Err(e) => return Err(e),
+            header_map
         };
         let stream_addr = self.deref_register(4);
 
@@ -4959,22 +4953,20 @@ impl Machine {
                             read_heap_cell!(heap_cell,
                                 (HeapCellValueTag::Str, s) => {
                                     let name = cell_as_atom_cell!(self.machine_st.heap[s]).get_name();
-                                let args: Vec<Atom> = match self.machine_st.try_from_list(self.machine_st.heap[s + 1], stub_gen) {
-                                    Ok(addrs) => {
-                                    let mut args = Vec::new();
-                                    for heap_cell in addrs {
-                                        args.push(cell_as_atom_cell!(heap_cell).get_name());
-                                    }
-                                    args
-                                    }
-                                    Err(e) => return Err(e)
-                                };
-                                let return_value = cell_as_atom_cell!(self.machine_st.heap[s + 2]);
-                                functions.push(FunctionDefinition {
-                                    name,
-                                    args,
-                                    return_value: return_value.get_name(),
-                                });
+                                    let args: Vec<Atom> = {
+                                        let addrs = self.machine_st.try_from_list(self.machine_st.heap[s + 1], stub_gen)?;
+                                        let mut args = Vec::new();
+                                        for heap_cell in addrs {
+                                            args.push(cell_as_atom_cell!(heap_cell).get_name());
+                                        }
+                                        args
+                                    };
+                                    let return_value = cell_as_atom_cell!(self.machine_st.heap[s + 2]);
+                                    functions.push(FunctionDefinition {
+                                        name,
+                                        args,
+                                        return_value: return_value.get_name(),
+                                    });
                                 }
                                 _ => {
                                     let err = self.machine_st.unreachable_error();
@@ -5217,26 +5209,24 @@ impl Machine {
             let struct_name_arg = self.machine_st.store(self.deref_register(1));
             let fields_reg = self.deref_register(2);
             if let Some(struct_name) = struct_name_arg.to_atom() {
-                let fields: Vec<Atom> = match self.machine_st.try_from_list(fields_reg, stub_gen) {
-                    Ok(addrs) => {
-                        let mut args = Vec::new();
-                        for heap_cell in addrs {
-                            let arg_cell = self.machine_st.store(self.machine_st.deref(heap_cell));
-                            let Some(arg) = arg_cell.to_atom() else {
-                                let err = if arg_cell.is_var() {
-                                    self.machine_st.instantiation_error()
-                                } else {
-                                    self.machine_st.type_error(ValidType::Atom, heap_cell)
-                                };
-
-                                return Err(self.machine_st.error_form(err, stub_gen()));
+                let fields: Vec<Atom> = {
+                    let addrs = self.machine_st.try_from_list(fields_reg, stub_gen)?;
+                    let mut args = Vec::new();
+                    for heap_cell in addrs {
+                        let arg_cell = self.machine_st.store(self.machine_st.deref(heap_cell));
+                        let Some(arg) = arg_cell.to_atom() else {
+                            let err = if arg_cell.is_var() {
+                                self.machine_st.instantiation_error()
+                            } else {
+                                self.machine_st.type_error(ValidType::Atom, heap_cell)
                             };
 
-                            args.push(arg);
-                        }
-                        args
+                            return Err(self.machine_st.error_form(err, stub_gen()));
+                        };
+
+                        args.push(arg);
                     }
-                    Err(e) => return Err(e),
+                    args
                 };
                 self.foreign_function_table
                     .define_struct(struct_name, fields)
