@@ -487,7 +487,7 @@ impl<T: CopierTarget> CopyTermState<T> {
                         self.copy_list(h)
                     }
                 }
-                (HeapCellValueTag::AttrVar | HeapCellValueTag::Var) => {
+                (HeapCellValueTag::AttrVar | HeapCellValueTag::StackVar | HeapCellValueTag::Var) => {
                     self.copy_var(addr)
                 }
                 (HeapCellValueTag::Str, h) => {
