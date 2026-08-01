@@ -71,17 +71,8 @@ main :-
         server_start(Server),
         ((
             server_wait_start(Server),
-            val("0"),
-            inc("1"),
-            val("1"),
-            inc("2"),
-            times2("4"),
-            dec("3"),
-            error("Internal Server Error"),
-            missing("Internal Server Error"),
-            val("3"), % after errors, previous value is saved
-            not_found("Not Found"),
-            echo("hello", "hello")
+            tests(Tests),
+            run_tests(Tests)
         )
         ;
         (
@@ -90,4 +81,4 @@ main :-
         server_stop(Server)
     ).
 
-% :- initialization(main).
+:- initialization(main).
