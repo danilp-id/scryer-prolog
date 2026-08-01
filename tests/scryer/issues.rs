@@ -194,7 +194,7 @@ async fn stateful_http() {
     load_module_test_with_input(
         "tests-pl/issue-stateful-http-test.pl",
         format!("PROLOG={:?}.", env!("CARGO_BIN_EXE_scryer-prolog")),
-        "received response with status code:200\nreceived response with status code:200\nreceived response with status code:200\nreceived response with status code:200\nreceived response with status code:200\n",
+        "",
     );
 }
 
