@@ -4829,8 +4829,18 @@ impl Machine {
                         break
                     }
                     Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                        // if INTERRUPT
+                        // if self.machine_st.fail {
+                        //     break;
+                        // }
                         if self.machine_st.check_for_interrupt() {
-                            break;
+                            let machine_error = self.machine_st.interrupt_error();
+                            let stub_gen = || functor_stub(atom!("http_accept"), 7);
+                            return Err(self.machine_st.error_form(machine_error, stub_gen()));
+                            //return Err(())
+                            //self.machine_st.fail = true;
+                            //break;
+                            //break;
                         }
                     }
                   Err(_) => {

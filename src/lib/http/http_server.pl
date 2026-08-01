@@ -162,55 +162,56 @@ call_(Module:Handler, HttpRequest, HttpResponse, State0, State) :-
 call_extra_params_(0, Module:Handler, HttpRequest, HttpResponse, State, State) :-
     call(Module:Handler, HttpRequest, HttpResponse).
 
-call_extra_params_(1, Module:Handler, HttpRequest, HttpResponse, _, State) :-
+call_extra_params_(1, Module:Handler, HttpRequest, HttpResponse, State, State) :-
     call(Module:Handler, HttpRequest, HttpResponse, State).
 
 call_extra_params_(2, Module:Handler, HttpRequest, HttpResponse, State0, State) :-
     call(Module:Handler, HttpRequest, HttpResponse, State0, State).
 
-http_loop(HttpListener, Handlers, State0) :-
-    time((
-        http_accept_(HttpListener, RequestMethod, RequestPath, RequestHeaders, RequestQuery, RequestStream, ResponseHandle),
-        current_time(Time),
-        phrase(format_time("%Y-%m-%d (%H:%M:%S)", Time), TimeString),
-        format("~s ~w ~s", [TimeString, RequestMethod, RequestPath]),
-        maplist(map_header_kv, RequestHeaders, RequestHeadersKV),
-        phrase(parse_queries(RequestQueries), RequestQuery),
+http_reply(HttpListener, Handlers, State0, State) :-
+    http_accept_(HttpListener, RequestMethod, RequestPath, RequestHeaders, RequestQuery, RequestStream, ResponseHandle),
+    current_time(Time),
+    phrase(format_time("%Y-%m-%d (%H:%M:%S)", Time), TimeString),
+    format("~s ~w ~s", [TimeString, RequestMethod, RequestPath]),
+    maplist(map_header_kv, RequestHeaders, RequestHeadersKV),
+    phrase(parse_queries(RequestQueries), RequestQuery),
+    (
+        match_handler(Handlers, RequestMethod, RequestPath, Handler) ->
         (
-            match_handler(Handlers, RequestMethod, RequestPath, Handler) ->
-            (
-                HttpRequest = http_request(RequestHeadersKV, stream(RequestStream), RequestQueries),
-                HttpResponse = http_response(_, _, _),
-                catch(
-                    (call_(Handler, HttpRequest, HttpResponse, State0, State) ->
-                        send_response(ResponseHandle, HttpResponse)
-                    ;
-                        setup_call_cleanup(
-                            http_answer_(ResponseHandle, 500, [], ResponseStream),
-                            format(ResponseStream, "Internal Server Error", []),
-                            close(ResponseStream)
-                        ),
-                        call_with_error_context(handler_not_available(Handler, RequestMethod, RequestPath, RequestQuery, RequestHeaders), [])
+            HttpRequest = http_request(RequestHeadersKV, stream(RequestStream), RequestQueries),
+            HttpResponse = http_response(_, _, _),
+            catch(
+                (call_(Handler, HttpRequest, HttpResponse, State0, State) ->
+                    send_response(ResponseHandle, HttpResponse)
+                ;
+                    setup_call_cleanup(
+                        http_answer_(ResponseHandle, 500, [], ResponseStream),
+                        format(ResponseStream, "Internal Server Error", []),
+                        close(ResponseStream)
                     ),
-                    HandlerError,
-                    (
-                        setup_call_cleanup(
-                            http_answer_(ResponseHandle, 500, [], ResponseStream),
-                            format(ResponseStream, "Internal Server Error", []),
-                            close(ResponseStream)
-                        ),
-                        throw(HandlerError)
-                    )
+                    call_with_error_context(handler_not_available(Handler, RequestMethod, RequestPath, RequestQuery, RequestHeaders), [])
+                ),
+                HandlerError,
+                (
+                    setup_call_cleanup(
+                        http_answer_(ResponseHandle, 500, [], ResponseStream),
+                        format(ResponseStream, "Internal Server Error", []),
+                        close(ResponseStream)
+                    ),
+                    throw(HandlerError)
                 )
             )
-            ;
-            setup_call_cleanup(
-                http_answer_(ResponseHandle, 404, [], ResponseStream),
-                format(ResponseStream, "Not Found", []),
-                close(ResponseStream)
-            )
         )
-    )),
+        ;
+        setup_call_cleanup(
+            http_answer_(ResponseHandle, 404, [], ResponseStream),
+            format(ResponseStream, "Not Found", []),
+            (close(ResponseStream), State = State0)
+        )
+    ).
+
+http_loop(HttpListener, Handlers, State0) :-
+    call_with_error_context(time(http_reply(HttpListener, Handlers, State0, State)), state-State0),
     http_loop(HttpListener, Handlers, State).
 
 send_response(ResponseHandle, http_response(StatusCode0, text(ResponseText), ResponseHeaders0)) :-

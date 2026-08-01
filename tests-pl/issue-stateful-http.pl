@@ -1,25 +1,52 @@
 :- use_module(library(http/http_server)).
 :- use_module(library(clpz)).
 :- use_module(library(charsio)).
+:- use_module(library(lists)).
 
-run :- http_listen(7890, [
+run :- run(0).
+
+run(State) :- http_listen(7890, [
   get(/, val),
   get(inc, inc),
   get(dec, dec),
   get(times2, times2),
-  %get(missing, missing),
+  get(error, my_error),
+  get(missing, missing),
   get(echo/Echo, echo(Echo))
-], [initial_state(0)]).
+], [initial_state(State)]).
 
-foo(X, X, Y, Y).
+run_uninterrupted :- run_uninterrupted(0).
+
+run_uninterrupted(State0) :-
+   catch(
+    run(State0),
+    error(E,Pairs),
+    (
+        E = '$interrupt_thrown' -> throw(error(E, Pairs))
+        ;
+        (
+            member(state-State, Pairs),
+            run_uninterrupted(State)
+        )
+    )
+   ).
+
+% NOTE: do not use raw throw/1 if you wish the state to be persisted on errors, see library(error).
+my_error(_, _) :- resource_error("all cookies expired").
+
+% does not use state
+echo(Echo, _, Response) :-
+    http_body(Response, text(Echo)).
 
 val_resp(Response, S) :-
     nl, write(S), nl,
     number_chars(S, SC),
     http_body(Response, text(SC)).
 
+% can only read state
 val(_, Response, S) :- val_resp(Response, S).
 
+% can read and modify state
 inc(_, Response, S0, S) :-
     S #= S0 + 1,
     val_resp(Response, S).
@@ -32,8 +59,3 @@ dec(_, Response, S0, S) :-
     S #= S0 - 1,
     val_resp(Response, S).
 
-% echo(Echo, _, Response) :-
-%     http_body(Response, text(Echo)).
-
-echo(Echo, _, Response, S, S) :-
-    http_body(Response, text(Echo)).
