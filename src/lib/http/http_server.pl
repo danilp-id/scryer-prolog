@@ -126,23 +126,25 @@ http_answer_(ResponseHandle, Code, Headers, ResponseStream) :-
     '$http_answer'(ResponseHandle, Code, Headers, ResponseStream).
 
 http_listen_(Port, Handlers, Options) :-
-    parse_options(Options, TLSKey, TLSCert, ContentLengthLimit, InitialState),
+    parse_options(Options, TLSKey, TLSCert, ContentLengthLimit, InitialState, CatchErrors),
     phrase(format_("0.0.0.0:~d", [Port]), Addr),
     setup_call_cleanup(
         (
             http_listen__(Addr, HttpListener, TLSKey, TLSCert, ContentLengthLimit),
             format("Listening at http://~s\n", [Addr])
         ),
-        http_loop(HttpListener, Handlers, InitialState),
+        http_loop(HttpListener, Handlers, InitialState, CatchErrors),
         http_listen_stop_(HttpListener)
     ).
 
-parse_options(Options, TLSKey, TLSCert, ContentLengthLimit, InitialState) :-
+parse_options(Options, TLSKey, TLSCert, ContentLengthLimit, InitialState, CatchErrors) :-
     member_option_default(tls_key, Options, "", TLSKey),
     member_option_default(tls_cert, Options, "", TLSCert),
     member_option_default(content_length_limit, Options, 32768, ContentLengthLimit),
+    must_be(integer, ContentLengthLimit),
     member_option_default(initial_state, Options, [], InitialState),
-    must_be(integer, ContentLengthLimit).
+    member_option_default(catch_errors, Options, false, CatchErrors),
+    must_be(boolean, CatchErrors).
 
 member_option_default(Key, List, _Default, Value) :-
     X =.. [Key, Value],
@@ -210,9 +212,26 @@ http_reply(HttpListener, Handlers, State0, State) :-
         )
     ).
 
-http_loop(HttpListener, Handlers, State0) :-
+% don't catch errors (for development web servers)
+http_loop(HttpListener, Handlers, State0, false) :-
     call_with_error_context(time(http_reply(HttpListener, Handlers, State0, State)), state-State0),
-    http_loop(HttpListener, Handlers, State).
+    http_loop(HttpListener, Handlers, State, false).
+
+% catch most errors (for production web servers)
+http_loop(HttpListener, Handlers, State0, true) :-
+   catch(
+    http_loop(HttpListener, Handlers, State0, false),
+    error(E,Pairs),
+    (
+        E = '$interrupt_thrown' -> throw(error(E, Pairs))
+        ;
+        (
+            write(error(E, Pairs)),nl, % TODO: should we not display the whole state?
+            member(state-State, Pairs),
+            http_loop(HttpListener, Handlers, State, true)
+        )
+    )
+   ).
 
 send_response(ResponseHandle, http_response(StatusCode0, text(ResponseText), ResponseHeaders0)) :-
     default(StatusCode0, 200, StatusCode),

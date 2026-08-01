@@ -3,9 +3,9 @@
 :- use_module(library(charsio)).
 :- use_module(library(lists)).
 
-run :- run(0).
+run :- run(false, 0).
 
-run(State) :- http_listen(7890, [
+run(CatchErrors, State) :- http_listen(7890, [
   get(/, val),
   get(inc, inc),
   get(dec, dec),
@@ -13,23 +13,9 @@ run(State) :- http_listen(7890, [
   get(error, my_error),
   get(missing, missing),
   get(echo/Echo, echo(Echo))
-], [initial_state(State)]).
+], [initial_state(State), catch_errors(CatchErrors)]).
 
-run_uninterrupted :- run_uninterrupted(0).
-
-run_uninterrupted(State0) :-
-   catch(
-    run(State0),
-    error(E,Pairs),
-    (
-        E = '$interrupt_thrown' -> throw(error(E, Pairs))
-        ;
-        (
-            member(state-State, Pairs),
-            run_uninterrupted(State)
-        )
-    )
-   ).
+run_uninterrupted :- run(true, 0).
 
 % NOTE: do not use raw throw/1 if you wish the state to be persisted on errors, see library(error).
 my_error(_, _) :- resource_error("all cookies expired").
