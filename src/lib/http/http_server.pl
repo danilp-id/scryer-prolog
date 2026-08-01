@@ -46,6 +46,29 @@ recommeded to use the helper predicates, which are easier to understand and clea
    - `http_redirect(Response, Url)`
    - `http_query(Request, QueryName, QueryValue)`
 
+## State
+
+To maintain state in the web server, use `initial_state/1` parameter (by default, set to [])
+along with handlers that have one or two extra parameters:
+
+```
+:- use_module(library(http/http_server)).
+
+run :- http_listen(7890, [
+  get(/, val),
+  get(inc, inc)
+], [initial_state("I")]).
+
+% read-only
+val(_, Response, S) :-
+    http_body(Response, text(S)).
+
+% read-write
+inc(_, Response, S0, S) :-
+    S = ['I' | S0],
+    http_body(Response, text(S)).
+```
+
 Some things that are still missing:
 
    - Read forms in multipart format
@@ -100,6 +123,8 @@ http_listen(Port, Module:Handlers0) :-
 % - `tls_key(+Key)` - a TLS key for HTTPS (string)
 % - `tls_cert(+Cert)` - a TLS cert for HTTPS (string)
 % - `content_length_limit(+Limit)` - maximum length (in bytes) for the incoming bodies. By default, 32KB.
+% - `initial_state(+State)` - initial server state. By default, []. Can use any term as initial state.
+% - `catch_errors(+Boolean)` - whether to catch all program errors (aside for interrupts). By default, web server will exit if any programming error is encountered.
 %
 % In order to have a HTTPS server (instead of plain HTTP), both `tls_key` and `tls_cert` options must be provided.
 http_listen(Port, Module:Handlers0, Options) :-
