@@ -188,6 +188,17 @@ async fn http_open_hanging() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(all(feature = "http", not(target_arch = "wasm32")))]
+#[cfg_attr(miri, ignore = "it takes too long to run")]
+async fn stateful_http() {
+    load_module_test_with_input(
+        "tests-pl/issue-stateful-http-test.pl",
+        format!("PROLOG={:?}.", env!("CARGO_BIN_EXE_scryer-prolog")),
+        "received response with status code:200\nreceived response with status code:200\nreceived response with status code:200\nreceived response with status code:200\nreceived response with status code:200\n",
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "repl")]
 #[cfg(unix)]
 #[cfg_attr(miri, ignore = "it takes too long to run")]

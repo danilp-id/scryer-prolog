@@ -1,47 +1,53 @@
-:- use_module(library(http/http_server)).
-:- use_module(library(clpz)).
+% Server
+:- use_module(library(process)).
+:- use_module(library(iso_ext)).
+:- use_module(library(os)).
+
+prolog_path(Prolog) :-
+    read(Body),
+    term_variables(Body, [Prolog]),
+    Body.
+
+server_start([Process,Out]) :-
+    prolog_path(Prolog),
+    process_create(Prolog,
+        ["tests-pl/issue-stateful-http_server", "-t", "run"],
+        [process(Process), stdout(pipe(Out))]).
+
+server_wait_start([_Process, Out]) :-
+    get_char(Out, _C).
+
+server_stop([Process,_Out]) :-
+    process_kill(Process).
+
+% Client 
 :- use_module(library(charsio)).
-:- use_module(library(lists)).
+:- use_module(library(http/http_open)).
 
-run :- run(false, 0).
+send_request(Path) :-
+    Options = [
+        method('get'),
+        status_code(StatusCode),
+        request_headers([]),
+        headers(_)
+    ],
+    append("http://localhost:8472/", Path, URL),
+    http_open(URL, Stream, Options),
+    get_line_to_chars(Stream,Line,[]),
+    write_term(Line, []),nl.
 
-run(CatchErrors, State) :- http_listen(7890, [
-  get(/, val),
-  get(inc, inc),
-  get(dec, dec),
-  get(times2, times2),
-  get(error, my_error),
-  get(missing, missing),
-  get(echo/Echo, echo(Echo))
-], [initial_state(State), catch_errors(CatchErrors)]).
+main :-
+    setup_call_cleanup(
+        server_start(Server),
+        (
+            server_wait_start(Server),
+            send_request,
+            send_request,
+            send_request,
+            send_request,
+            send_request
+        ),
+        server_stop(Server)
+    ).
 
-run_uninterrupted :- run(true, 0).
-
-% NOTE: do not use raw throw/1 if you wish the state to be persisted on errors, see library(error).
-my_error(_, _) :- resource_error("all cookies expired").
-
-% does not use state
-echo(Echo, _, Response) :-
-    http_body(Response, text(Echo)).
-
-val_resp(Response, S) :-
-    nl, write(S), nl,
-    number_chars(S, SC),
-    http_body(Response, text(SC)).
-
-% can only read state
-val(_, Response, S) :- val_resp(Response, S).
-
-% can read and modify state
-inc(_, Response, S0, S) :-
-    S #= S0 + 1,
-    val_resp(Response, S).
-
-times2(_, Response, S0, S) :-
-    S #= S0*2,
-    val_resp(Response, S).
-
-dec(_, Response, S0, S) :-
-    S #= S0 - 1,
-    val_resp(Response, S).
-
+:- initialization(main).
