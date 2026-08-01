@@ -26,14 +26,8 @@ server_stop([Process,_Out]) :-
 :- use_module(library(http/http_open)).
 
 send_request(Path, Result) :-
-    Options = [
-        method('get'),
-        status_code(StatusCode),
-        request_headers([]),
-        headers(_)
-    ],
     append("http://localhost:8472/", Path, URL),
-    http_open(URL, Stream, Options),
+    http_open(URL, Stream, []),
     get_line_to_chars(Stream,Result,"").
 
 % client
