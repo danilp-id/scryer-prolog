@@ -39,6 +39,7 @@ error(Val) :- send_request("error", Val).
 missing(Val) :- send_request("missing", Val).
 not_found(Val) :- send_request("not_found", Val).
 echo(In,Resp) :- append("echo/", In, URL), send_request(URL, Resp).
+set(Val,Resp) :- append("set/", Val, URL), send_request(URL, Resp).
 
 run_tests([]).
 run_tests([T|Ts]) :-
@@ -57,7 +58,9 @@ tests([
     val("3"), % after errors, previous value is saved
     not_found("Not Found"),
     echo("hello", "hello"),
-    val("3")
+    val("3"),
+    set("9000"),
+    val("9000")
 ]).
 
 main :-

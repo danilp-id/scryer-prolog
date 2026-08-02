@@ -12,7 +12,8 @@ run(CatchErrors, State) :- http_listen(8472, [
   get(times2, times2),
   get(error, my_error),
   get(missing, missing),
-  get(echo/Echo, echo(Echo))
+  get(echo/Echo, echo(Echo)),
+  get(set/Val, set(Val))
 ], [initial_state(State), catch_errors(CatchErrors)]).
 
 run_uninterrupted :- run(true, 0).
@@ -45,3 +46,7 @@ dec(_, Response, S0, S) :-
     S #= S0 - 1,
     val_resp(Response, S).
 
+% example using both path parameters and state
+set(Val, _, Response, _, ValN) :-
+    number_chars(ValN, Val),
+    val_resp(Response, ValN).
