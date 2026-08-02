@@ -192,7 +192,7 @@ async fn http_open_hanging() {
 #[cfg_attr(miri, ignore = "it takes too long to run")]
 async fn stateful_http() {
     load_module_test_with_input(
-        "tests-pl/issue-stateful-http-test.pl",
+        "tests-pl/issue-stateful-http.pl",
         format!("PROLOG={:?}.", env!("CARGO_BIN_EXE_scryer-prolog")),
         "",
     );
