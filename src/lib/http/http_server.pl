@@ -123,7 +123,7 @@ http_listen(Port, Module:Handlers0) :-
 % - `tls_key(+Key)` - a TLS key for HTTPS (string)
 % - `tls_cert(+Cert)` - a TLS cert for HTTPS (string)
 % - `content_length_limit(+Limit)` - maximum length (in bytes) for the incoming bodies. By default, 32KB.
-% - `initial_state(+State)` - initial server state. By default, []. Can use any term as initial state.
+% - `initial_state(+State)` - initial server state. By default, `[]`. Can use any term as initial state.
 % - `catch_errors(+Boolean)` - whether to catch all program errors (aside for interrupts). By default, web server will exit if any programming error is encountered.
 %
 % In order to have a HTTPS server (instead of plain HTTP), both `tls_key` and `tls_cert` options must be provided.
@@ -178,7 +178,6 @@ member_option_default(Key, List, Default, Default) :-
     X =.. [Key, _],
     \+ member(X, List).
 
-% there exists a match that modifies a state
 call_(Module:Handler, HttpRequest, HttpResponse, State0, State) :-
     Handler =.. [Name | Args],
     length(Args, Arity0),
