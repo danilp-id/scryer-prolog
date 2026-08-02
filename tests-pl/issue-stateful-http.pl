@@ -59,7 +59,7 @@ tests([
     not_found("Not Found"),
     echo("hello", "hello"),
     val("3"),
-    set("9000"),
+    set("9000", "9000"),
     val("9000")
 ]).
 
