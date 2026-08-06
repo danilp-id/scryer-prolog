@@ -46,6 +46,29 @@ recommeded to use the helper predicates, which are easier to understand and clea
    - `http_redirect(Response, Url)`
    - `http_query(Request, QueryName, QueryValue)`
 
+## State
+
+To maintain state in the web server, use `initial_state/1` parameter (by default, set to [])
+along with handlers that have one or two extra parameters:
+
+```
+:- use_module(library(http/http_server)).
+
+run :- http_listen(7890, [
+  get(/, val),
+  get(inc, inc)
+], [initial_state("I")]).
+
+% read-only
+val(_, Response, S) :-
+    http_body(Response, text(S)).
+
+% read-write
+inc(_, Response, S0, S) :-
+    S = ['I' | S0],
+    http_body(Response, text(S)).
+```
+
 Some things that are still missing:
 
    - Read forms in multipart format
@@ -71,6 +94,7 @@ Some things that are still missing:
 :- meta_predicate(http_basic_auth(:, :, ?, ?)).
 
 :- use_module(library(charsio)).
+:- use_module(library(clpz)).
 :- use_module(library(crypto)).
 :- use_module(library(error)).
 :- use_module(library(format)).
@@ -99,6 +123,8 @@ http_listen(Port, Module:Handlers0) :-
 % - `tls_key(+Key)` - a TLS key for HTTPS (string)
 % - `tls_cert(+Cert)` - a TLS cert for HTTPS (string)
 % - `content_length_limit(+Limit)` - maximum length (in bytes) for the incoming bodies. By default, 32KB.
+% - `initial_state(+State)` - initial server state. By default, `[]`. Can use any term as initial state.
+% - `catch_errors(+Boolean)` - whether to catch all program errors (aside from interrupts). By default, web server will exit if any programming error is encountered.
 %
 % In order to have a HTTPS server (instead of plain HTTP), both `tls_key` and `tls_cert` options must be provided.
 http_listen(Port, Module:Handlers0, Options) :-
@@ -125,22 +151,25 @@ http_answer_(ResponseHandle, Code, Headers, ResponseStream) :-
     '$http_answer'(ResponseHandle, Code, Headers, ResponseStream).
 
 http_listen_(Port, Handlers, Options) :-
-    parse_options(Options, TLSKey, TLSCert, ContentLengthLimit),
+    parse_options(Options, TLSKey, TLSCert, ContentLengthLimit, InitialState, CatchErrors),
     phrase(format_("0.0.0.0:~d", [Port]), Addr),
     setup_call_cleanup(
         (
             http_listen__(Addr, HttpListener, TLSKey, TLSCert, ContentLengthLimit),
             format("Listening at http://~s\n", [Addr])
         ),
-        http_loop(HttpListener, Handlers),
+        http_loop(HttpListener, Handlers, InitialState, CatchErrors),
         http_listen_stop_(HttpListener)
     ).
 
-parse_options(Options, TLSKey, TLSCert, ContentLengthLimit) :-
+parse_options(Options, TLSKey, TLSCert, ContentLengthLimit, InitialState, CatchErrors) :-
     member_option_default(tls_key, Options, "", TLSKey),
     member_option_default(tls_cert, Options, "", TLSCert),
     member_option_default(content_length_limit, Options, 32768, ContentLengthLimit),
-    must_be(integer, ContentLengthLimit).
+    must_be(integer, ContentLengthLimit),
+    member_option_default(initial_state, Options, [], InitialState),
+    member_option_default(catch_errors, Options, false, CatchErrors),
+    must_be(boolean, CatchErrors).
 
 member_option_default(Key, List, _Default, Value) :-
     X =.. [Key, Value],
@@ -149,50 +178,84 @@ member_option_default(Key, List, Default, Default) :-
     X =.. [Key, _],
     \+ member(X, List).
 
-http_loop(HttpListener, Handlers) :-
-    time((
-        http_accept_(HttpListener, RequestMethod, RequestPath, RequestHeaders, RequestQuery, RequestStream, ResponseHandle),
-        current_time(Time),
-        phrase(format_time("%Y-%m-%d (%H:%M:%S)", Time), TimeString),
-        format("~s ~w ~s", [TimeString, RequestMethod, RequestPath]),
-        maplist(map_header_kv, RequestHeaders, RequestHeadersKV),
-        phrase(parse_queries(RequestQueries), RequestQuery),
+call_(Module:Handler, HttpRequest, HttpResponse, State0, State) :-
+    Handler =.. [Name | Args],
+    length(Args, Arity0),
+    current_predicate(Module:Name/Arity),
+    NumExtraParams #= Arity - Arity0 - 2,
+    call_extra_params_(NumExtraParams, Module:Handler, HttpRequest, HttpResponse, State0, State).
+
+call_extra_params_(0, Module:Handler, HttpRequest, HttpResponse, State, State) :-
+    call(Module:Handler, HttpRequest, HttpResponse).
+
+call_extra_params_(1, Module:Handler, HttpRequest, HttpResponse, State, State) :-
+    call(Module:Handler, HttpRequest, HttpResponse, State).
+
+call_extra_params_(2, Module:Handler, HttpRequest, HttpResponse, State0, State) :-
+    call(Module:Handler, HttpRequest, HttpResponse, State0, State).
+
+http_reply(HttpListener, Handlers, State0, State) :-
+    http_accept_(HttpListener, RequestMethod, RequestPath, RequestHeaders, RequestQuery, RequestStream, ResponseHandle),
+    current_time(Time),
+    phrase(format_time("%Y-%m-%d (%H:%M:%S)", Time), TimeString),
+    format("~s ~w ~s", [TimeString, RequestMethod, RequestPath]),
+    maplist(map_header_kv, RequestHeaders, RequestHeadersKV),
+    phrase(parse_queries(RequestQueries), RequestQuery),
+    (
+        match_handler(Handlers, RequestMethod, RequestPath, Handler) ->
         (
-            match_handler(Handlers, RequestMethod, RequestPath, Handler) ->
-            (
-                HttpRequest = http_request(RequestHeadersKV, stream(RequestStream), RequestQueries),
-                HttpResponse = http_response(_, _, _),
-                catch(
-                    (call(Handler, HttpRequest, HttpResponse) ->
-                        send_response(ResponseHandle, HttpResponse)
-                    ;
-                        setup_call_cleanup(
-                            http_answer_(ResponseHandle, 500, [], ResponseStream),
-                            format(ResponseStream, "Internal Server Error", []),
-                            close(ResponseStream)
-                        ),
-                        throw(handler_not_available(Handler, RequestMethod, RequestPath, RequestQuery, RequestHeaders))
+            HttpRequest = http_request(RequestHeadersKV, stream(RequestStream), RequestQueries),
+            HttpResponse = http_response(_, _, _),
+            catch(
+                (call_(Handler, HttpRequest, HttpResponse, State0, State) ->
+                    send_response(ResponseHandle, HttpResponse)
+                ;
+                    setup_call_cleanup(
+                        http_answer_(ResponseHandle, 500, [], ResponseStream),
+                        format(ResponseStream, "Internal Server Error", []),
+                        close(ResponseStream)
                     ),
-                    HandlerError,
-                    (
-                        setup_call_cleanup(
-                            http_answer_(ResponseHandle, 500, [], ResponseStream),
-                            format(ResponseStream, "Internal Server Error", []),
-                            close(ResponseStream)
-                        ),
-                        throw(HandlerError)
-                    )
+                    call_with_error_context(handler_not_available(Handler, RequestMethod, RequestPath, RequestQuery, RequestHeaders), [])
+                ),
+                HandlerError,
+                (
+                    setup_call_cleanup(
+                        http_answer_(ResponseHandle, 500, [], ResponseStream),
+                        format(ResponseStream, "Internal Server Error", []),
+                        close(ResponseStream)
+                    ),
+                    throw(HandlerError)
                 )
             )
-            ;
-            setup_call_cleanup(
-                http_answer_(ResponseHandle, 404, [], ResponseStream),
-                format(ResponseStream, "Not Found", []),
-                close(ResponseStream)
-            )
         )
-    )),
-    http_loop(HttpListener, Handlers).
+        ;
+        setup_call_cleanup(
+            http_answer_(ResponseHandle, 404, [], ResponseStream),
+            format(ResponseStream, "Not Found", []),
+            (close(ResponseStream), State = State0)
+        )
+    ).
+
+% don't catch errors (for development web servers)
+http_loop(HttpListener, Handlers, State0, false) :-
+    call_with_error_context(time(http_reply(HttpListener, Handlers, State0, State)), state-State0),
+    http_loop(HttpListener, Handlers, State, false).
+
+% catch most errors (for production web servers)
+http_loop(HttpListener, Handlers, State0, true) :-
+   catch(
+    http_loop(HttpListener, Handlers, State0, false),
+    error(E,Pairs),
+    (
+        E = '$interrupt_thrown' -> throw(error(E, Pairs))
+        ;
+        (
+            write(error(E, Pairs)),nl, % TODO: should we not display the whole state?
+            member(state-State, Pairs),
+            http_loop(HttpListener, Handlers, State, true)
+        )
+    )
+   ).
 
 send_response(ResponseHandle, http_response(StatusCode0, text(ResponseText), ResponseHeaders0)) :-
     default(StatusCode0, 200, StatusCode),
