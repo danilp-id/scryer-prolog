@@ -262,10 +262,10 @@ response_stream_configured(text(_), Stream0, Stream) :-
 response_stream_configured(bytes(_), Stream, Stream).
 response_stream_configured(file(_), Stream, Stream).
 
-respstream_response(ResponseStream, text(Filename)) :-
+respstream_response(ResponseStream, text(ResponseText)) :-
     format(ResponseStream, "~s", [ResponseText]).
 
-respstream_response(ResponseStream, bytes(Filename)) :-
+respstream_response(ResponseStream, bytes(ResponseBytes)) :-
     format(ResponseStream, "~s", [ResponseBytes]).
 
 respstream_response(ResponseStream, file(Filename)) :-
@@ -282,7 +282,7 @@ send_response(ResponseHandle, http_response(StatusCode0, Response, ResponseHeade
     default(StatusCode0, 200, StatusCode),
     maplist(map_header_kv_2, ResponseHeaders, ResponseHeaders0),
     http_answer_(ResponseHandle, StatusCode, ResponseHeaders, ResponseStream0),
-    response_stream_configured(Response, ResponseStream0, ResponseStream)
+    response_stream_configured(Response, ResponseStream0, ResponseStream),
     catch(
         call_cleanup(respstream_response(ResponseStream, Response),close(ResponseStream)),
         error(existence_error(stream, _), _),
