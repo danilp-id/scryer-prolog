@@ -40,7 +40,7 @@ recommeded to use the helper predicates, which are easier to understand and clea
    - `http_headers(Response/Request, Headers)`
    - `http_status_code(Responde, StatusCode)`
    - `http_body(Response/Request, text(Body))`
-   - `http_body(Response/Request, binary(Body))`
+   - `http_body(Response/Request, bytes(Body))`
    - `http_body(Request, form(Form))`
    - `http_body(Response, file(Filename))`
    - `http_redirect(Response, Url)`
@@ -257,47 +257,37 @@ http_loop(HttpListener, Handlers, State0, true) :-
     )
    ).
 
-send_response(ResponseHandle, http_response(StatusCode0, text(ResponseText), ResponseHeaders0)) :-
+response_stream_configured(text(_), Stream0, Stream) :-
+    open(stream(Stream0), write, Stream, [type(text)]).
+response_stream_configured(bytes(_), Stream, Stream).
+response_stream_configured(file(_), Stream, Stream).
+
+respstream_response(ResponseStream, text(Filename)) :-
+    format(ResponseStream, "~s", [ResponseText]).
+
+respstream_response(ResponseStream, bytes(Filename)) :-
+    format(ResponseStream, "~s", [ResponseBytes]).
+
+respstream_response(ResponseStream, file(Filename)) :-
+    setup_call_cleanup(
+        open(Filename, read, FileStream, [type(binary)]),
+        (
+            get_n_chars(FileStream, _, FileCs),
+            format(ResponseStream, "~s", [FileCs])
+        ),
+        close(FileStream)
+    ).
+
+send_response(ResponseHandle, http_response(StatusCode0, Response, ResponseHeaders0)) :-
     default(StatusCode0, 200, StatusCode),
     maplist(map_header_kv_2, ResponseHeaders, ResponseHeaders0),
     http_answer_(ResponseHandle, StatusCode, ResponseHeaders, ResponseStream0),
-    open(stream(ResponseStream0), write, ResponseStream, [type(text)]),
+    response_stream_configured(Response, ResponseStream0, ResponseStream)
     catch(
-	call_cleanup(format(ResponseStream, "~s", [ResponseText]),close(ResponseStream)),
-	error(existence_error(stream, _), _),
-	true
+        call_cleanup(respstream_response(ResponseStream, Response),close(ResponseStream)),
+        error(existence_error(stream, _), _),
+        true
     ).
-
-send_response(ResponseHandle, http_response(StatusCode0, bytes(ResponseBytes), ResponseHeaders0)) :-
-    default(StatusCode0, 200, StatusCode),
-    maplist(map_header_kv_2, ResponseHeaders, ResponseHeaders0),
-    http_answer_(ResponseHandle, StatusCode, ResponseHeaders, ResponseStream),
-    catch(
-    call_cleanup(format(ResponseStream, "~s", [ResponseBytes]),close(ResponseStream)),
-	error(existence_error(stream, _), _),
-	true
-    ).
-
-send_response(ResponseHandle, http_response(StatusCode0, file(Filename), ResponseHeaders0)) :-
-    default(StatusCode0, 200, StatusCode),
-    maplist(map_header_kv_2, ResponseHeaders, ResponseHeaders0),
-    http_answer_(ResponseHandle, StatusCode, ResponseHeaders, ResponseStream),
-    catch(
-	call_cleanup(
-	    setup_call_cleanup(
-		open(Filename, read, FileStream, [type(binary)]),
-		(
-		    get_n_chars(FileStream, _, FileCs),
-		    format(ResponseStream, "~s", [FileCs])
-		),
-		close(FileStream)
-	    ),
-	    close(ResponseStream)
-	),
-	error(existence_error(stream, _), _),
-	true
-    ).
-
 
 default(Var, Default, Out) :-
     (var(Var) -> Out = Default
