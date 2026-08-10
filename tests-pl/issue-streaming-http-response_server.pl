@@ -10,6 +10,11 @@ run :- http_listen(8472, [
   get(file, file)
 ]).
 
+% desired semantics:
+% you can set some parts of the response only once (response code and headers),
+% while other parts you can set multiple times (data to send to response stream)
+% this would allow streaming responses
+
 stream(_, Response) :-
   write("1 "), portray_clause(Response),
   http_body(Response, text("hello")),
