@@ -223,7 +223,7 @@ http_reply(HttpListener, Handlers, State0, State) :-
             HttpResponse = http_response(_, ResponseHandle, _, _),
             catch(
                 (call_(Handler, HttpRequest, HttpResponse, State0, State) ->
-                    send_response(ResponseHandle, HttpResponse)
+                    true
                 ;
                     setup_call_cleanup(
                         http_answer_(ResponseHandle, 500, [], ResponseStream),
