@@ -194,6 +194,20 @@ call_extra_params_(1, Module:Handler, HttpRequest, HttpResponse, State, State) :
 call_extra_params_(2, Module:Handler, HttpRequest, HttpResponse, State0, State) :-
     call(Module:Handler, HttpRequest, HttpResponse, State0, State).
 
+%% PLAN:
+% make http_accept_ open up response stream, not just request stream
+% right now it just gives response handle
+% in fact, can just give response stream isntead of response handle
+%
+% http_answer_(ResponseHandle, Code, Headers, ResponseStream)
+%
+% actually, we still need reponse handle to set response code and headers
+% so, the plan:
+% keep HttpResponse as http_response(_, _, _) at first
+% then we need to insert resposne stream into http_response (as second argument)
+% state machine:
+% 1. when first http_body/2 operation is invoked, it checks if 
+
 http_reply(HttpListener, Handlers, State0, State) :-
     http_accept_(HttpListener, RequestMethod, RequestPath, RequestHeaders, RequestQuery, RequestStream, ResponseHandle),
     current_time(Time),
@@ -204,8 +218,9 @@ http_reply(HttpListener, Handlers, State0, State) :-
     (
         match_handler(Handlers, RequestMethod, RequestPath, Handler) ->
         (
+            % TODO: why we wrap RequestStream into stream/1 struct?
             HttpRequest = http_request(RequestHeadersKV, stream(RequestStream), RequestQueries),
-            HttpResponse = http_response(_, _, _),
+            HttpResponse = http_response(_, ResponseHandle, _, _),
             catch(
                 (call_(Handler, HttpRequest, HttpResponse, State0, State) ->
                     send_response(ResponseHandle, HttpResponse)
@@ -277,6 +292,24 @@ respstream_response(ResponseStream, file(Filename)) :-
         ),
         close(FileStream)
     ).
+
+begin_response(http_response(StatusCode0, ResponseHandle, ResponseStream, ResponseHeaders0)) :-
+    format("begin_response begin~n", []),
+    default(StatusCode0, 200, StatusCode),
+    maplist(map_header_kv_2, ResponseHeaders, ResponseHeaders0),
+    http_answer_(ResponseHandle, StatusCode, ResponseHeaders, ResponseStream),
+    format("begin_response end~n", []).
+
+% for now, can only continue once (because stream is closed)
+continue_response(ResponseStream0, Response) :-
+    format("continue_response begin~n", []),
+    response_stream_configured(Response, ResponseStream0, ResponseStream),
+    catch(
+        call_cleanup(respstream_response(ResponseStream, Response),close(ResponseStream)),
+        error(existence_error(stream, _), _),
+        true
+    ),
+    format("continue_response end~n", []).
 
 send_response(ResponseHandle, http_response(StatusCode0, Response, ResponseHeaders0)) :-
     default(StatusCode0, 200, StatusCode),
@@ -373,7 +406,17 @@ http_body(http_request(Headers, stream(StreamBody), _), form(FormBody)) :-
     get_n_chars(StreamBody, _, TextBody),
     phrase(parse_queries(FormBody), TextBody).
 http_body(http_request(_, Body, _), Body).
-http_body(http_response(_, Body, _), Body).
+http_body(http_response(_, _, ResponseStream, _), Body) :-
+    format("http_body 1~n", []),
+    nonvar(ResponseStream),
+    format("nonvar~n", []),
+    continue_response(ResponseStream, Body).
+http_body(http_response(StatusCode, ResponseHandle, ResponseStream, ResponseHeaders), Body) :-
+    format("http_body 2~n", []),
+    var(ResponseStream),
+    begin_response(http_response(StatusCode, ResponseHandle, ResponseStream, ResponseHeaders)),
+    continue_response(ResponseStream, Body).
+
 
 %% http_status_code(?Response, ?StatusCode).
 %

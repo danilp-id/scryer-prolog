@@ -4,7 +4,7 @@
 :- use_module(library(format)).
 
 run :- http_listen(8472, [
-  get(/, stream),
+  get(stream, stream),
   get(text, text),
   get(bytes, bytes),
   get(file, file)
@@ -23,7 +23,10 @@ stream(_, Response) :-
   write("3 "), portray_clause(Response).
 
 text(_, Response) :-
-  http_body(Response, text("some text")).
+  format("text begin~n", []),
+  portray_clause(Response),
+  http_body(Response, text("some text")),
+  format("text end~n", []).
 
 bytes(_, Response) :-
   http_body(Response, bytes("some bytes")).
