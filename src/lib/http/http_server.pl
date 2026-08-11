@@ -220,10 +220,10 @@ http_reply(HttpListener, Handlers, State0, State) :-
         (
             % TODO: why we wrap RequestStream into stream/1 struct?
             HttpRequest = http_request(RequestHeadersKV, stream(RequestStream), RequestQueries),
-            HttpResponse = http_response(_, ResponseHandle, _, _),
+            HttpResponse = http_response(_, ResponseHandle, ResponseStream, _),
             catch(
                 (call_(Handler, HttpRequest, HttpResponse, State0, State) ->
-                    true
+                    close(ResponseStream)
                 ;
                     setup_call_cleanup(
                         http_answer_(ResponseHandle, 500, [], ResponseStream),
@@ -305,7 +305,8 @@ continue_response(ResponseStream0, Response) :-
     format("continue_response begin~n", []),
     response_stream_configured(Response, ResponseStream0, ResponseStream),
     catch(
-        call_cleanup(respstream_response(ResponseStream, Response),close(ResponseStream)),
+        respstream_response(ResponseStream, Response),
+        %call_cleanup(respstream_response(ResponseStream, Response),close(ResponseStream)),
         error(existence_error(stream, _), _),
         true
     ),
@@ -389,7 +390,7 @@ string_without(_, []) -->
 % True iff `Request_Response` is a request or response with headers Headers. Can be used both to get headers (usually in from a request)
 % and to add headers (usually in a response).
 http_headers(http_request(Headers, _, _), Headers).
-http_headers(http_response(_, _, Headers), Headers).
+http_headers(http_response(_, _, _, Headers), Headers).
 
 %% http_body(?Request_Response, ?Body).
 %
@@ -421,11 +422,12 @@ http_body(http_response(StatusCode, ResponseHandle, ResponseStream, ResponseHead
 %% http_status_code(?Response, ?StatusCode).
 %
 % True iff the status code of the response Response unifies with StatusCode.
-http_status_code(http_response(StatusCode, _, _), StatusCode).
+http_status_code(http_response(StatusCode, _, _, _), StatusCode).
 
 %% http_redirect(-Response, +Uri).
 %
 % True iff Response is a response that redirects the user to the uri Uri.
+% TODO
 http_redirect(http_response(307, text("Moved Temporarily"), ["Location"-Uri]), Uri).
 
 %% http_query(+Request, ?Key, ?Value).
