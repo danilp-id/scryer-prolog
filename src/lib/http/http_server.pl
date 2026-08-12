@@ -209,7 +209,9 @@ call_extra_params_(2, Module:Handler, HttpRequest, HttpResponse, State0, State) 
 % 1. when first http_body/2 operation is invoked, it checks if 
 
 http_reply(HttpListener, Handlers, State0, State) :-
+    format("before http_accenpt_~n", []),
     http_accept_(HttpListener, RequestMethod, RequestPath, RequestHeaders, RequestQuery, RequestStream, ResponseHandle),
+    format("after http_accept_~n", []),
     current_time(Time),
     phrase(format_time("%Y-%m-%d (%H:%M:%S)", Time), TimeString),
     format("~s ~w ~s", [TimeString, RequestMethod, RequestPath]),
@@ -223,7 +225,8 @@ http_reply(HttpListener, Handlers, State0, State) :-
             HttpResponse = http_response(_, ResponseHandle, ResponseStream, _),
             catch(
                 (call_(Handler, HttpRequest, HttpResponse, State0, State) ->
-                    close(ResponseStream)
+                    true
+                    %close(ResponseStream)
                 ;
                     setup_call_cleanup(
                         http_answer_(ResponseHandle, 500, [], ResponseStream),

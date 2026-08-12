@@ -4737,9 +4737,12 @@ impl Machine {
             (HeapCellValueTag::Cons, cons_ptr) => {
                 match_untyped_arena_ptr!(cons_ptr,
                     (ArenaHeaderTag::HttpListener, http_listener) => {
+                        println!("before loop");
                         loop {
+                            println!("loop start");
                             match http_listener.incoming.recv_timeout(std::time::Duration::from_millis(200)) {
                                 Ok(request) => {
+                                    println!("Ok request");
                                     let method_atom = match request.request_data.method {
                                         Method::GET => atom!("get"),
                                         Method::POST => atom!("post"),
