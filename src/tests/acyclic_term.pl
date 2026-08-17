@@ -1,5 +1,6 @@
 :- use_module(library(dcgs)).
 :- use_module(library(format)).
+:- use_module(library(lists)).
 
 term1(A) :-
    B=[C|D],
@@ -258,6 +259,32 @@ test("acyclic_term#2130_2", (
 test("acyclic_term#2131", (
     A=[B],C=[B],C=[A],
     \+ acyclic_term(C)
+)).
+
+test("acyclic_term#3231_1", (
+    Term = f("a"),
+    acyclic_term(Term),
+    Term == f("a")
+)).
+
+test("acyclic_term#3231_2", (
+    Term = f("a", 0),
+    acyclic_term(Term),
+    Term == f("a", 0)
+)).
+
+test("acyclic_term#3231_append", (
+    append("hel", "lo", X),
+    acyclic_term(X),
+    X == "hello"
+)).
+
+test("acyclic_term#3231_not_destructive", (
+    T = [[a]],
+    findall(Copy,
+        ( ( true ; acyclic_term(T) ; true ),
+            copy_term(T, Copy) ), [R1,R2,R3]),
+    R1 == R2, R2 == R3
 )).
 
 main :-
