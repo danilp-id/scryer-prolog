@@ -4660,29 +4660,26 @@ impl Machine {
                 );
 
             let warp_shutdown_clone = warp_shutdown.clone();
-            runtime.spawn(async move {
-                match ssl_server {
-                    Some((key, cert)) => {
-                        let (_addr, server) = warp::serve(serve)
-                            .tls()
-                            .key(key)
-                            .cert(cert)
-                            .bind_with_graceful_shutdown(addr, async move {
-                                warp_shutdown_clone.notified().await;
-                            });
+            let bound = match ssl_server {
+                Some((key, cert)) => warp::serve(serve)
+                    .tls()
+                    .key(key)
+                    .cert(cert)
+                    .try_bind_with_graceful_shutdown(addr, async move {
+                        warp_shutdown_clone.notified().await;
+                    })
+                    .map(|(_addr, server)| runtime.spawn(server)),
+                None => warp::serve(serve)
+                    .try_bind_with_graceful_shutdown(addr, async move {
+                        warp_shutdown_clone.notified().await;
+                    })
+                    .map(|(_addr, server)| runtime.spawn(server)),
+            };
 
-                        tokio::task::spawn(server);
-                    }
-                    None => {
-                        let (_addr, server) =
-                            warp::serve(serve).bind_with_graceful_shutdown(addr, async move {
-                                warp_shutdown_clone.notified().await;
-                            });
-
-                        tokio::task::spawn(server);
-                    }
-                }
-            });
+            if bound.is_err() {
+                self.machine_st.fail = true;
+                return Ok(());
+            }
 
             let http_listener = HttpListener {
                 incoming: rx,

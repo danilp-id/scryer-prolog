@@ -199,6 +199,13 @@ async fn stateful_http() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[cfg(all(feature = "http", not(target_arch = "wasm32")))]
+#[cfg_attr(miri, ignore = "it takes too long to run")]
+async fn issue3415_http_listen_port_in_use() {
+    load_module_test("tests-pl/issue3415.pl", "second_listen_failed\n");
+}
+
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "repl")]
 #[cfg(unix)]
 #[cfg_attr(miri, ignore = "it takes too long to run")]
