@@ -29,6 +29,8 @@ pub(crate) struct CycleDetectingIter<'a, const STOP_AT_CYCLES: bool> {
     next: u64,
     cycle_found: bool,
     mark_phase: bool,
+    pstr_save: Option<u64>,
+    next_override: Option<u64>,
 }
 
 impl<'a, const STOP_AT_CYCLES: bool> CycleDetectingIter<'a, STOP_AT_CYCLES> {
@@ -43,6 +45,8 @@ impl<'a, const STOP_AT_CYCLES: bool> CycleDetectingIter<'a, STOP_AT_CYCLES> {
             next,
             cycle_found: false,
             mark_phase: true,
+            pstr_save: None,
+            next_override: None,
         }
     }
 
@@ -214,7 +218,7 @@ impl<'a, const STOP_AT_CYCLES: bool> CycleDetectingIter<'a, STOP_AT_CYCLES> {
                         }
 
                         self.heap[tail_idx].set_forwarding_bit(true);
-
+                        self.pstr_save = Some(self.next);
                         self.next = self.heap[tail_idx].get_value();
                         self.heap[tail_idx].set_value(self.current as u64);
                         self.current = tail_idx;
@@ -304,6 +308,11 @@ impl<'a, const STOP_AT_CYCLES: bool> CycleDetectingIter<'a, STOP_AT_CYCLES> {
                 self.heap[self.current].set_forwarding_bit(true);
                 false
             }
+            HeapCellValueTag::PStrLoc => {
+                self.heap[self.current].set_mark_bit(self.mark_phase);
+                self.next_override = self.pstr_save.take();
+                true
+            }
             HeapCellValueTag::Lis => {
                 if self.heap[self.current].get_mark_bit() == self.mark_phase {
                     true
@@ -335,7 +344,7 @@ impl<'a, const STOP_AT_CYCLES: bool> CycleDetectingIter<'a, STOP_AT_CYCLES> {
             let temp = self.heap[self.current].get_value();
 
             self.heap[self.current].set_value(self.next);
-            self.next = self.current as u64;
+            self.next = self.next_override.take().unwrap_or(self.current as u64);
             self.current = temp as usize;
         }
 
