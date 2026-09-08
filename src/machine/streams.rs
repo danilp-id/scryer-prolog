@@ -37,9 +37,6 @@ use std::sync::mpsc::TryRecvError;
 #[cfg(feature = "tls")]
 use native_tls::TlsStream;
 
-#[cfg(feature = "http")]
-use warp::hyper;
-
 #[derive(Debug, Specifier, Clone, Copy, PartialEq, Eq, Hash)]
 #[bits = 1]
 pub enum StreamType {
@@ -300,7 +297,7 @@ impl Read for HttpReadStream {
 #[cfg(feature = "http")]
 pub struct HttpWriteStream {
     status_code: u16,
-    headers: std::mem::ManuallyDrop<hyper::HeaderMap>,
+    headers: std::mem::ManuallyDrop<warp::http::header::HeaderMap>,
     response: TypedArenaPtr<HttpResponse>,
     buffer: std::mem::ManuallyDrop<Vec<u8>>,
 }
@@ -338,9 +335,15 @@ impl Drop for HttpWriteStream {
         {
             let mut response = response.lock().unwrap();
 
+            //use warp::{Filter, http::Response};
             let mut response_ = warp::http::Response::builder().status(self.status_code);
             *response_.headers_mut().unwrap() = headers;
-            *response = Some(response_.body(warp::hyper::Body::from(buffer)).unwrap());
+            //*response = Some(response_.body(buffer).unwrap());
+            
+            // debug 2
+            //*response = Some(response_.body(warp::Reply::into_response(self)).unwrap());
+            // debug
+            //*response = Some(response_.body("").unwrap());
         }
         *ready = true;
         cvar.notify_one();
@@ -1487,7 +1490,7 @@ impl Stream {
     pub(crate) fn from_http_sender(
         response: TypedArenaPtr<HttpResponse>,
         status_code: u16,
-        headers: hyper::HeaderMap,
+        headers: warp::http::header::HeaderMap,
         arena: &mut Arena,
     ) -> Self {
         Stream::HttpWrite(arena_alloc!(

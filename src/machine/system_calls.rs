@@ -56,8 +56,6 @@ use std::net::{TcpListener, TcpStream};
 use std::process;
 use std::process::Child;
 use std::process::Stdio;
-#[cfg(feature = "http")]
-use std::str::FromStr;
 use std::sync::LazyLock;
 #[cfg(feature = "http")]
 use std::sync::{Arc, Condvar, Mutex};
@@ -96,10 +94,6 @@ use roxmltree;
 use futures::future;
 #[cfg(feature = "http")]
 use reqwest::Url;
-#[cfg(feature = "http")]
-use warp::hyper::header::{HeaderName, HeaderValue};
-#[cfg(feature = "http")]
-use warp::hyper::{HeaderMap, Method};
 #[cfg(feature = "http")]
 use warp::{Buf, Filter};
 
@@ -4389,6 +4383,8 @@ impl Machine {
         let method = read_heap_cell!(self.deref_register(3),
             (HeapCellValueTag::Atom, (name, arity)) => {
                 debug_assert_eq!(arity, 0);
+                //use warp::http::Method;
+                use reqwest::Method;
                 match name {
                     atom!("get") => Method::GET,
                     atom!("post") => Method::POST,
@@ -4415,13 +4411,16 @@ impl Machine {
             let addrs = self
                 .machine_st
                 .try_from_list(self.machine_st.registers[7], stub_gen)?;
-            let mut header_map = HeaderMap::new();
+            //use warp::http::header;
+            use reqwest::header;
+            use std::str::FromStr;
+            let mut header_map = header::HeaderMap::new();
             for heap_cell in addrs {
                 read_heap_cell!(heap_cell,
                     (HeapCellValueTag::Str, s) => {
                         let name = cell_as_atom_cell!(self.machine_st.heap[s]).get_name();
                         let value = self.machine_st.value_to_str_like(self.machine_st.heap[s + 1]).unwrap();
-                        header_map.insert(HeaderName::from_str(&name.as_str()).unwrap(), HeaderValue::from_str(&value.as_str()).unwrap());
+                        header_map.insert(header::HeaderName::from_str(&name.as_str()).unwrap(), header::HeaderValue::from_str(&value.as_str()).unwrap());
                     }
                     _ => {
                         unreachable!()
@@ -4580,6 +4579,8 @@ impl Machine {
         };
 
         if let Some(address_str) = self.machine_st.value_to_str_like(address_sink) {
+            use futures::FutureExt;
+
             let address_string = address_str.as_str();
             let addr: SocketAddr = match address_string
                 .to_socket_addrs()
@@ -4618,14 +4619,17 @@ impl Machine {
                           headers: warp::http::HeaderMap,
                           path: warp::filters::path::FullPath,
                           query| {
-                        if let Some(content_length) = content_length
-                            && content_length > content_length_limit
-                        {
-                            return warp::http::Response::builder()
-                                .status(413)
-                                .body(warp::hyper::Body::empty())
-                                .unwrap();
-                        }
+                            // debug
+                        // if let Some(content_length) = content_length
+                        //     && content_length > content_length_limit
+                        // {
+                        //     // return warp::http::Response::builder()
+                        //     //     .status(413)
+                        //     //     //.body("")
+                        //     //     .unwrap();
+
+                        //     return warp::reply::with_status(warp::reply(), warp::http::StatusCode::PAYLOAD_TOO_LARGE);
+                        // }
 
                         let http_request_data = HttpRequestData {
                             method,
@@ -4654,32 +4658,56 @@ impl Machine {
                         {
                             let (_, response, _) = &*response;
                             let response = response.lock().unwrap().take();
+                            //response.expect()
                             response.expect("Data race error in HTTP server")
                         }
                     },
                 );
 
             let warp_shutdown_clone = warp_shutdown.clone();
-            let bound = match ssl_server {
-                Some((key, cert)) => warp::serve(serve)
-                    .tls()
-                    .key(key)
-                    .cert(cert)
-                    .try_bind_with_graceful_shutdown(addr, async move {
-                        warp_shutdown_clone.notified().await;
-                    })
-                    .map(|(_addr, server)| runtime.spawn(server)),
-                None => warp::serve(serve)
-                    .try_bind_with_graceful_shutdown(addr, async move {
-                        warp_shutdown_clone.notified().await;
-                    })
-                    .map(|(_addr, server)| runtime.spawn(server)),
-            };
+            // TODO: support tls, can use warp_openssl
+            // let bound = match ssl_server {
+            //     Some((key, cert)) => warp::serve(serve)
+            //         .tls()
+            //         .key(key)
+            //         .cert(cert)
+            //         .try_bind_with_graceful_shutdown(addr, async move {
+            //             warp_shutdown_clone.notified().await;
+            //         })
+            //         .map(|(_addr, server)| runtime.spawn(server)),
+            //     None => warp::serve(serve)
+            //         .try_bind_with_graceful_shutdown(addr, async move {
+            //             warp_shutdown_clone.notified().await;
+            //         })
+            //         .map(|(_addr, server)| runtime.spawn(server)),
+            // };
 
-            if bound.is_err() {
-                self.machine_st.fail = true;
-                return Ok(());
-            }
+            runtime.spawn(async move {
+                let bound = warp::serve(serve)
+                    .bind(addr).await
+                    .graceful(async move { warp_shutdown_clone.notified().await });
+
+                    // if bound.is_err() {
+                    //     self.machine_st.fail = true;
+                    //     return Ok(());
+                    // }
+            });
+
+            // debug
+            // let bound = warp::serve(serve)
+            //     .bind(addr);
+            //     //.map(|(server)| runtime.spawn(server)); // debug
+            //     // TODO: add graceful shutdown
+            //     // .graceful(async move {
+            //     //     warp_shutdown_clone.notified().await;
+            //     // })
+            //     // TODO: spawn server
+            //     //.map(|(_addr, server)| runtime.spawn(server));
+
+            // if bound.is_err() {
+            //     self.machine_st.fail = true;
+            //     return Ok(());
+            // }
 
             let http_listener = HttpListener {
                 incoming: rx,
@@ -4737,6 +4765,7 @@ impl Machine {
                         loop {
                             match http_listener.incoming.recv_timeout(std::time::Duration::from_millis(200)) {
                                 Ok(request) => {
+                                    use warp::http::Method;
                                     let method_atom = match request.request_data.method {
                                         Method::GET => atom!("get"),
                                         Method::POST => atom!("post"),
@@ -4866,13 +4895,15 @@ impl Machine {
             let addrs = self
                 .machine_st
                 .try_from_list(self.machine_st.registers[3], stub_gen)?;
-            let mut header_map = HeaderMap::new();
+            use warp::http::header;
+            use std::str::FromStr;
+            let mut header_map = header::HeaderMap::new();
             for heap_cell in addrs {
                 read_heap_cell!(heap_cell,
                     (HeapCellValueTag::Str, s) => {
                         let name = cell_as_atom_cell!(self.machine_st.heap[s]).get_name();
                         let value = self.machine_st.value_to_str_like(self.machine_st.heap[s + 1]).unwrap();
-                        header_map.insert(HeaderName::from_str(&name.as_str()).unwrap(), HeaderValue::from_str(&value.as_str()).unwrap());
+                        header_map.insert(header::HeaderName::from_str(&name.as_str()).unwrap(), header::HeaderValue::from_str(&value.as_str()).unwrap());
                     }
                     _ => {
                         unreachable!()
