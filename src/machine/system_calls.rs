@@ -4685,7 +4685,8 @@ impl Machine {
             runtime.spawn(async move {
                 let bound = warp::serve(serve)
                     .bind(addr).await
-                    .graceful(async move { warp_shutdown_clone.notified().await });
+                    .graceful(async move { warp_shutdown_clone.notified().await })
+                    .run().await;
 
                     // if bound.is_err() {
                     //     self.machine_st.fail = true;
