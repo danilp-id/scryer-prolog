@@ -16,6 +16,8 @@ pub use modular_bitfield::prelude::*;
 
 #[cfg(feature = "http")]
 use bytes::{Buf, Bytes, buf::Reader as BufReader};
+#[cfg(feature = "http")]
+use warp::reply::Reply;
 use std::cmp::Ordering;
 use std::error::Error;
 use std::fmt;
@@ -338,8 +340,14 @@ impl Drop for HttpWriteStream {
             //use warp::{Filter, http::Response};
             let mut response_ = warp::http::Response::builder().status(self.status_code);
             *response_.headers_mut().unwrap() = headers;
+            // old one:
+            //*response = Some(response_.body(warp::hyper::Body::from(buffer)).unwrap());
+            //*response = Some(response_.body(warp::hyper::Body::from(buffer)).unwrap());
             //*response = Some(response_.body(buffer).unwrap());
-            
+            //*response = Some(warp::http::Response)
+            //*response = Some(response_.body(()).unwrap());
+            *response = Some(warp::reply().into_response());
+
             // debug 2
             //*response = Some(response_.body(warp::Reply::into_response(self)).unwrap());
             // debug
