@@ -346,7 +346,12 @@ impl Drop for HttpWriteStream {
             //*response = Some(response_.body(buffer).unwrap());
             //*response = Some(warp::http::Response)
             //*response = Some(response_.body(()).unwrap());
-            *response = Some(warp::reply().into_response());
+
+            // works:
+            //*response = Some(warp::reply().into_response());
+
+            let r = warp::reply().into_response();
+            *response = Some(response_.body(r.into_body()).unwrap());
 
             // debug 2
             //*response = Some(response_.body(warp::Reply::into_response(self)).unwrap());
