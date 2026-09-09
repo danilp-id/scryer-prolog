@@ -350,8 +350,21 @@ impl Drop for HttpWriteStream {
             // works:
             //*response = Some(warp::reply().into_response());
 
+            // works:
             let r = warp::reply().into_response();
             *response = Some(response_.body(r.into_body()).unwrap());
+
+
+            //let r = warp::reply::html().into_response();
+            //r.body_mut() = buffer;
+            // let r = warp::http::Response::builder()
+            //     .header("my-custom-header", "some-value")
+            //     .body("and a custom body")
+            //     .unwrap();
+            // *response = Some(response_.body(r.into_body()).unwrap());
+
+            //http_body
+            //warp::http::Response::
 
             // debug 2
             //*response = Some(response_.body(warp::Reply::into_response(self)).unwrap());
