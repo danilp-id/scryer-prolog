@@ -4590,7 +4590,7 @@ impl Machine {
                 Some(addr) => addr,
                 _ => {
                     self.machine_st.fail = true;
-                    return Ok(());
+                    return Ok(()); // TODO: produce an exception instead of silently failing
                 }
             };
 
@@ -4698,50 +4698,9 @@ impl Machine {
                 }
                 Err(_) => {
                     self.machine_st.fail = true;
-                    return Ok(());
+                    return Ok(()); // TODO: produce an exception instead of silently failing
                 }
             }
-
-            // if let Ok(acceptor) = runtime.block_on(async {
-            //     tokio::net::TcpListener::bind(addr).await
-            // }) {
-            //     runtime.spawn(async move {
-            //         warp::serve(serve)
-            //         .incoming(acceptor)
-            //         .graceful(async move { warp_shutdown_clone.notified().await })
-            //         .run().await;
-            //     });
-            // } else {
-            //     self.machine_st.fail = true;
-            //     return Ok(());
-            // };
-            
-            // runtime.spawn(async move {
-            //     if let Ok(acceptor) = tokio::net::TcpListener::bind(addr).await {
-            //         warp::serve(serve)
-            //         .incoming(acceptor)
-            //         .graceful(async move { warp_shutdown_clone.notified().await })
-            //         .run().await;
-            //     } else {
-            //         //self.machine_st.fail = true;
-            //     }
-            // });
-
-            // debug
-            // let bound = warp::serve(serve)
-            //     .bind(addr);
-            //     //.map(|(server)| runtime.spawn(server)); // debug
-            //     // TODO: add graceful shutdown
-            //     // .graceful(async move {
-            //     //     warp_shutdown_clone.notified().await;
-            //     // })
-            //     // TODO: spawn server
-            //     //.map(|(_addr, server)| runtime.spawn(server));
-
-            // if bound.is_err() {
-            //     self.machine_st.fail = true;
-            //     return Ok(());
-            // }
 
             let http_listener = HttpListener {
                 incoming: rx,
