@@ -340,6 +340,7 @@ impl Drop for HttpWriteStream {
             //use warp::{Filter, http::Response};
             let mut response_ = warp::http::Response::builder().status(self.status_code);
             *response_.headers_mut().unwrap() = headers;
+            //hyper::Body::from()
             // old one:
             //*response = Some(response_.body(warp::hyper::Body::from(buffer)).unwrap());
             //*response = Some(response_.body(warp::hyper::Body::from(buffer)).unwrap());
@@ -351,8 +352,15 @@ impl Drop for HttpWriteStream {
             //*response = Some(warp::reply().into_response());
 
             // works:
-            let r = warp::reply().into_response();
-            *response = Some(response_.body(r.into_body()).unwrap());
+            // let r = warp::reply().into_response();
+            // *response = Some(response_.body(r.into_body()).unwrap());
+
+
+            //*response = Some(response_.body(hyper::Body::from(buffer)).unwrap());
+
+            // Bytes::from(s).into()
+            *response = Some(response_.body(Bytes::from("Hello, world").into()).unwrap());
+
 
 
             //let r = warp::reply::html().into_response();
