@@ -4683,20 +4683,14 @@ impl Machine {
             // };
 
             runtime.spawn(async move {
-                //let addr = addr.into();
-                let acceptor = tokio::net::TcpListener::bind(addr)
-                    .await
-                    .expect("failed to bind to address");
-
-                let bound = warp::serve(serve)
+                if let Ok(acceptor) = tokio::net::TcpListener::bind(addr).await {
+                    warp::serve(serve)
                     .incoming(acceptor)
                     .graceful(async move { warp_shutdown_clone.notified().await })
                     .run().await;
-
-                    // if bound.is_err() {
-                    //     self.machine_st.fail = true;
-                    //     return Ok(());
-                    // }
+                } else {
+                    //self.machine_st.fail = true;
+                }
             });
 
             // debug
