@@ -4664,7 +4664,7 @@ impl Machine {
                     },
                 );
 
-            let warp_shutdown_clone = warp_shutdown.clone();
+            
             // TODO: support tls, can use warp_openssl
             // let bound = match ssl_server {
             //     Some((key, cert)) => warp::serve(serve)
@@ -4682,16 +4682,50 @@ impl Machine {
             //         .map(|(_addr, server)| runtime.spawn(server)),
             // };
 
-            runtime.spawn(async move {
-                if let Ok(acceptor) = tokio::net::TcpListener::bind(addr).await {
-                    warp::serve(serve)
-                    .incoming(acceptor)
-                    .graceful(async move { warp_shutdown_clone.notified().await })
-                    .run().await;
-                } else {
-                    //self.machine_st.fail = true;
+            let warp_shutdown_clone = warp_shutdown.clone();
+            match std::net::TcpListener::bind(addr) {
+                Ok(acceptor) => {
+                    let _ = acceptor.set_nonblocking(true);
+
+                    let tokio_acceptor = tokio::net::TcpListener::from_std(acceptor).expect("TCP socket not async");
+
+                    runtime.spawn(async move {
+                        warp::serve(serve)
+                        .incoming(tokio_acceptor)
+                        .graceful(async move { warp_shutdown_clone.notified().await })
+                        .run().await;
+                    });
                 }
-            });
+                Err(_) => {
+                    self.machine_st.fail = true;
+                    return Ok(());
+                }
+            }
+
+            // if let Ok(acceptor) = runtime.block_on(async {
+            //     tokio::net::TcpListener::bind(addr).await
+            // }) {
+            //     runtime.spawn(async move {
+            //         warp::serve(serve)
+            //         .incoming(acceptor)
+            //         .graceful(async move { warp_shutdown_clone.notified().await })
+            //         .run().await;
+            //     });
+            // } else {
+            //     self.machine_st.fail = true;
+            //     return Ok(());
+            // };
+            
+            // runtime.spawn(async move {
+            //     if let Ok(acceptor) = tokio::net::TcpListener::bind(addr).await {
+            //         warp::serve(serve)
+            //         .incoming(acceptor)
+            //         .graceful(async move { warp_shutdown_clone.notified().await })
+            //         .run().await;
+            //     } else {
+            //         //self.machine_st.fail = true;
+            //     }
+            // });
 
             // debug
             // let bound = warp::serve(serve)
