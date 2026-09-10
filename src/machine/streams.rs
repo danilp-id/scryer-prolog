@@ -359,7 +359,12 @@ impl Drop for HttpWriteStream {
             //*response = Some(response_.body(hyper::Body::from(buffer)).unwrap());
 
             // Bytes::from(s).into()
-            *response = Some(response_.body(Bytes::from("Hello, world").into()).unwrap());
+
+            // works:
+            //*response = Some(response_.body(Bytes::from("Hello, world").into()).unwrap());
+
+
+            *response = Some(response_.body(Bytes::from(buffer).into()).unwrap());
 
 
 
