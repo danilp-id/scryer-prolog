@@ -337,52 +337,9 @@ impl Drop for HttpWriteStream {
         {
             let mut response = response.lock().unwrap();
 
-            //use warp::{Filter, http::Response};
             let mut response_ = warp::http::Response::builder().status(self.status_code);
             *response_.headers_mut().unwrap() = headers;
-            //hyper::Body::from()
-            // old one:
-            //*response = Some(response_.body(warp::hyper::Body::from(buffer)).unwrap());
-            //*response = Some(response_.body(warp::hyper::Body::from(buffer)).unwrap());
-            //*response = Some(response_.body(buffer).unwrap());
-            //*response = Some(warp::http::Response)
-            //*response = Some(response_.body(()).unwrap());
-
-            // works:
-            //*response = Some(warp::reply().into_response());
-
-            // works:
-            // let r = warp::reply().into_response();
-            // *response = Some(response_.body(r.into_body()).unwrap());
-
-
-            //*response = Some(response_.body(hyper::Body::from(buffer)).unwrap());
-
-            // Bytes::from(s).into()
-
-            // works:
-            //*response = Some(response_.body(Bytes::from("Hello, world").into()).unwrap());
-
-
             *response = Some(response_.body(Bytes::from(buffer).into()).unwrap());
-
-
-
-            //let r = warp::reply::html().into_response();
-            //r.body_mut() = buffer;
-            // let r = warp::http::Response::builder()
-            //     .header("my-custom-header", "some-value")
-            //     .body("and a custom body")
-            //     .unwrap();
-            // *response = Some(response_.body(r.into_body()).unwrap());
-
-            //http_body
-            //warp::http::Response::
-
-            // debug 2
-            //*response = Some(response_.body(warp::Reply::into_response(self)).unwrap());
-            // debug
-            //*response = Some(response_.body("").unwrap());
         }
         *ready = true;
         cvar.notify_one();
