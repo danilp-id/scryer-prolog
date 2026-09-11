@@ -4619,17 +4619,15 @@ impl Machine {
                           headers: warp::http::HeaderMap,
                           path: warp::filters::path::FullPath,
                           query| {
-                            // debug
-                        // if let Some(content_length) = content_length
-                        //     && content_length > content_length_limit
-                        // {
-                        //     // return warp::http::Response::builder()
-                        //     //     .status(413)
-                        //     //     //.body("")
-                        //     //     .unwrap();
-
-                        //     return warp::reply::with_status(warp::reply(), warp::http::StatusCode::PAYLOAD_TOO_LARGE);
-                        // }
+                        if let Some(content_length) = content_length
+                            && content_length > content_length_limit
+                        {
+                            use warp::Reply;
+                            return warp::http::Response::builder()
+                                .status(413)
+                                .body(warp::reply().into_response().into_body())
+                                .unwrap();
+                        }
 
                         let http_request_data = HttpRequestData {
                             method,
@@ -4658,7 +4656,6 @@ impl Machine {
                         {
                             let (_, response, _) = &*response;
                             let response = response.lock().unwrap().take();
-                            //response.expect()
                             response.expect("Data race error in HTTP server")
                         }
                     },
@@ -4685,11 +4682,19 @@ impl Machine {
             //warp::
 
             let warp_shutdown_clone = warp_shutdown.clone();
+
             match std::net::TcpListener::bind(addr) {
                 Ok(acceptor) => {
                     let _ = acceptor.set_nonblocking(true);
 
+                    //tokio_rustls::
+
                     let tokio_acceptor = tokio::net::TcpListener::from_std(acceptor).expect("TCP socket not async");
+
+                    // TODO: to support tls, create a custom class and wrap tokio tcp acceptor with it
+                    // this class would accept a connection, do tls on it, and pass it forward
+                    // ... that's literally what warp used to 
+                    
 
                     runtime.spawn(async move {
                         warp::serve(serve)

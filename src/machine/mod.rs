@@ -25,6 +25,7 @@ pub mod preprocessor;
 pub mod stack;
 pub mod streams;
 pub mod system_calls;
+pub mod tls; // TODO: move to http module?
 pub mod term_stream;
 pub mod unify;
 
