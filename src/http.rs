@@ -2,7 +2,7 @@ use bytes::{Bytes, buf::Reader};
 use std::sync::{Arc, Condvar, Mutex};
 use tokio::sync::Notify;
 
-use warp::{Filter, http};
+use warp::{Filter, filters::BoxedFilter, http, reply::Reply};
 
 pub struct HttpListener {
     pub incoming: std::sync::mpsc::Receiver<HttpRequest>,
@@ -26,13 +26,14 @@ pub struct HttpRequestData {
 
 use futures_util::future::TryFuture;
 
-pub fn http_server<Addr, Serve>(addr: Addr, shutdown: Arc<Notify>, serve: Serve) -> Result<(), std::io::Error>
+pub fn http_server<Addr>(addr: Addr, shutdown: Arc<Notify>, serve: BoxedFilter<(impl Reply + 'static,)>) -> Result<(), std::io::Error>
 where
-    Addr: std::net::ToSocketAddrs,
-    Serve: Filter + Clone,
-    <Serve::Future as TryFuture>::Ok: warp::Reply,
-    Serve: Future + Send + 'static,
-    Serve::Output: Send + 'static,
+    Addr: std::net::ToSocketAddrs
+//    <Serve as warp::filter::FilterBase>::Extract: warp::Reply,
+
+    // <Serve::Future as TryFuture>::Ok: warp::Reply,
+    // Serve: Future + Send + 'static,
+    // Serve::Output: Send + 'static,
     //<Serve::Future as TryFuture>::Error: warp::reject::IsReject,
 {
     let runtime = tokio::runtime::Handle::current();
@@ -136,16 +137,6 @@ where
                         eprintln!("timed out wait for all connections to close");
                     }
                 }
-
-
-                // hyper direct end
-
-                // warp::serve(serve)
-                // .incoming(tokio_acceptor) // no tls
-                // //.incoming(tls_acceptor) // tls
-                // .graceful(async move { warp_shutdown_clone.notified().await })
-                // .run().await;
-                //return Ok(());
             });
 
             return Ok(());

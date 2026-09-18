@@ -4703,7 +4703,7 @@ impl Machine {
                             response.expect("Data race error in HTTP server")
                         }
                     },
-                );
+                ).boxed();
 
             
             // TODO: support tls, can use warp_openssl
@@ -4727,133 +4727,134 @@ impl Machine {
 
             let warp_shutdown_clone = warp_shutdown.clone();
 
-            match std::net::TcpListener::bind(addr) {
-                Ok(acceptor) => {
-                    //use crate::machine::tls;
+            let server = crate::http::http_server(addr, warp_shutdown_clone, serve);
+            // match std::net::TcpListener::bind(addr) {
+            //     Ok(acceptor) => {
+            //         //use crate::machine::tls;
 
-                    let _ = acceptor.set_nonblocking(true);
+            //         let _ = acceptor.set_nonblocking(true);
 
-                    //tokio_rustls::
+            //         //tokio_rustls::
 
-                    let tokio_acceptor = tokio::net::TcpListener::from_std(acceptor).expect("TCP socket not async");
+            //         let tokio_acceptor = tokio::net::TcpListener::from_std(acceptor).expect("TCP socket not async");
 
-                    //warp::ser
-                    //warp::ac
-                    //let tls_acceptor = tls::tls::Tls(tokio_acceptor);
+            //         //warp::ser
+            //         //warp::ac
+            //         //let tls_acceptor = tls::tls::Tls(tokio_acceptor);
 
-                    // TODO: to support tls, create a custom class and wrap tokio tcp acceptor with it
-                    // this class would accept a connection, do tls on it, and pass it forward
-                    // ... that's literally what warp used to 
+            //         // TODO: to support tls, create a custom class and wrap tokio tcp acceptor with it
+            //         // this class would accept a connection, do tls on it, and pass it forward
+            //         // ... that's literally what warp used to 
                     
 
-                    runtime.spawn(async move {
+            //         runtime.spawn(async move {
 
-                        // lets use hyper directly!
-                        use std::convert::Infallible;
-                        use std::net::SocketAddr;
+            //             // lets use hyper directly!
+            //             use std::convert::Infallible;
+            //             use std::net::SocketAddr;
 
-                        use http_body_util::Full;
-                        use hyper::body::Bytes;
-                        use hyper::server::conn::http1;
-                        use hyper::service::service_fn;
-                        use hyper::{Request, Response};
-                        use hyper_util::rt::TokioIo;
-                        use tokio::net::TcpListener;
+            //             use http_body_util::Full;
+            //             use hyper::body::Bytes;
+            //             use hyper::server::conn::http1;
+            //             use hyper::service::service_fn;
+            //             use hyper::{Request, Response};
+            //             use hyper_util::rt::TokioIo;
+            //             use tokio::net::TcpListener;
 
-                        let listener = tokio_acceptor;
-                        let graceful = hyper_util::server::graceful::GracefulShutdown::new();
-                        let mut signal = std::pin::pin!(async move { warp_shutdown_clone.notified().await });
+            //             let listener = tokio_acceptor;
+            //             let graceful = hyper_util::server::graceful::GracefulShutdown::new();
+            //             let mut signal = std::pin::pin!(async move { warp_shutdown_clone.notified().await });
 
-                        // We start a loop to continuously accept incoming connections
-                        loop {
-                            tokio::select! {
-                                Ok((stream, _addr)) = listener.accept() => {
-                                    let serve = serve.clone();
+            //             // We start a loop to continuously accept incoming connections
+            //             loop {
+            //                 tokio::select! {
+            //                     Ok((stream, _addr)) = listener.accept() => {
+            //                         let serve = serve.clone();
 
-                                    // tls begin
-                                    // let stream = match ssl_server {
-                                    //     Some((ref key, ref cert)) => {
+            //                         // tls begin
+            //                         // let stream = match ssl_server {
+            //                         //     Some((ref key, ref cert)) => {
 
-                                    //         use tokio_rustls::rustls::ServerConfig;
-                                    //         use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer};
+            //                         //         use tokio_rustls::rustls::ServerConfig;
+            //                         //         use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer};
 
-                                    //         use tokio_rustls::rustls::pki_types::pem::PemObject;
-                                    //         //use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer};
-                                    //         use tokio_rustls::rustls::server::Acceptor;
-                                    //         use tokio_rustls::server::TlsStream;
-                                    //         use tokio_rustls::{LazyConfigAcceptor, TlsAcceptor};
+            //                         //         use tokio_rustls::rustls::pki_types::pem::PemObject;
+            //                         //         //use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer};
+            //                         //         use tokio_rustls::rustls::server::Acceptor;
+            //                         //         use tokio_rustls::server::TlsStream;
+            //                         //         use tokio_rustls::{LazyConfigAcceptor, TlsAcceptor};
 
-                                    //         let config = Arc::new(
-                                    //                 ServerConfig::builder()
-                                    //                     .with_no_client_auth()
-                                    //                     .with_single_cert(
-                                    //                         CertificateDer::pem_file_iter(&cert).expect("certificate").collect::<Result<_, _>>().expect("certificate loaded"),
-                                    //                         PrivateKeyDer::from_pem_file(&key).expect("private key"),
-                                    //                     ).expect("config"),
-                                    //             );
-                                    //         let acceptor = TlsAcceptor::from(config.clone());
+            //                         //         let config = Arc::new(
+            //                         //                 ServerConfig::builder()
+            //                         //                     .with_no_client_auth()
+            //                         //                     .with_single_cert(
+            //                         //                         CertificateDer::pem_file_iter(&cert).expect("certificate").collect::<Result<_, _>>().expect("certificate loaded"),
+            //                         //                         PrivateKeyDer::from_pem_file(&key).expect("private key"),
+            //                         //                     ).expect("config"),
+            //                         //             );
+            //                         //         let acceptor = TlsAcceptor::from(config.clone());
 
-                                    //         acceptor.accept(stream)
-                                    //     },
-                                    //     None => stream,
-                                    // };
-                                    // tls end
+            //                         //         acceptor.accept(stream)
+            //                         //     },
+            //                         //     None => stream,
+            //                         // };
+            //                         // tls end
 
-                                    // Use an adapter to access something implementing `tokio::io` traits as if they implement
-                                    // `hyper::rt` IO traits.
-                                    let io = TokioIo::new(stream);
+            //                         // Use an adapter to access something implementing `tokio::io` traits as if they implement
+            //                         // `hyper::rt` IO traits.
+            //                         let io = TokioIo::new(stream);
 
-                                    // Spawn a tokio task to serve multiple connections concurrently
-                                    tokio::task::spawn(async move {
-                                        // Finally, we bind the incoming connection to our `hello` service
-                                        if let Err(err) = http1::Builder::new()
-                                            // `service_fn` converts our function in a `Service`
-                                            .serve_connection(io, hyper_util::service::TowerToHyperService::new(warp::service(serve)))
-                                            //.serve_connection(io, service_fn(async |_: Request<hyper::body::Incoming>| -> Result<Response<Full<Bytes>>, Infallible> {
-                                            //    Ok(Response::new(Full::new(Bytes::from("Hello, World!"))))
-                                            //}))
-                                            .await
-                                        {
-                                            eprintln!("Error serving connection: {:?}", err);
-                                        }
-                                    });
-                                },
-                                _ = &mut signal => {
-                                    drop(listener);
-                                    //eprintln!("graceful shutdown signal received");
-                                    // stop the accept loop
-                                    break;
-                                }
-                            }
+            //                         // Spawn a tokio task to serve multiple connections concurrently
+            //                         tokio::task::spawn(async move {
+            //                             // Finally, we bind the incoming connection to our `hello` service
+            //                             if let Err(err) = http1::Builder::new()
+            //                                 // `service_fn` converts our function in a `Service`
+            //                                 .serve_connection(io, hyper_util::service::TowerToHyperService::new(warp::service(serve)))
+            //                                 //.serve_connection(io, service_fn(async |_: Request<hyper::body::Incoming>| -> Result<Response<Full<Bytes>>, Infallible> {
+            //                                 //    Ok(Response::new(Full::new(Bytes::from("Hello, World!"))))
+            //                                 //}))
+            //                                 .await
+            //                             {
+            //                                 eprintln!("Error serving connection: {:?}", err);
+            //                             }
+            //                         });
+            //                     },
+            //                     _ = &mut signal => {
+            //                         drop(listener);
+            //                         //eprintln!("graceful shutdown signal received");
+            //                         // stop the accept loop
+            //                         break;
+            //                     }
+            //                 }
 
-                        //    let (stream, _) = listener.accept().await.expect("not connected");
+            //             //    let (stream, _) = listener.accept().await.expect("not connected");
                             
-                        }
+            //             }
 
-                        tokio::select! {
-                            _ = graceful.shutdown() => {
-                                //eprintln!("all connections gracefully closed");
-                            },
-                            _ = tokio::time::sleep(std::time::Duration::from_secs(10)) => {
-                                eprintln!("timed out wait for all connections to close");
-                            }
-                        }
+            //             tokio::select! {
+            //                 _ = graceful.shutdown() => {
+            //                     //eprintln!("all connections gracefully closed");
+            //                 },
+            //                 _ = tokio::time::sleep(std::time::Duration::from_secs(10)) => {
+            //                     eprintln!("timed out wait for all connections to close");
+            //                 }
+            //             }
 
 
-                        // hyper direct end
+            //             // hyper direct end
 
-                        // warp::serve(serve)
-                        // .incoming(tokio_acceptor) // no tls
-                        // //.incoming(tls_acceptor) // tls
-                        // .graceful(async move { warp_shutdown_clone.notified().await })
-                        // .run().await;
-                    });
-                }
-                Err(_) => {
-                    self.machine_st.fail = true;
-                    return Ok(()); // TODO: produce an exception instead of silently failing
-                }
-            }
+            //             // warp::serve(serve)
+            //             // .incoming(tokio_acceptor) // no tls
+            //             // //.incoming(tls_acceptor) // tls
+            //             // .graceful(async move { warp_shutdown_clone.notified().await })
+            //             // .run().await;
+            //         });
+            //     }
+            //     Err(_) => {
+            //         self.machine_st.fail = true;
+            //         return Ok(()); // TODO: produce an exception instead of silently failing
+            //     }
+            // }
 
             let http_listener = HttpListener {
                 incoming: rx,
