@@ -4770,6 +4770,15 @@ impl Machine {
                                 Ok((stream, _addr)) = listener.accept() => {
                                     let serve = serve.clone();
 
+                                    // tls begin
+                                    let stream = match ssl_server {
+                                        Some((ref key, ref cert)) =>
+
+                                        stream,
+                                        None => stream,
+                                    };
+                                    // tls end
+
                                     // Use an adapter to access something implementing `tokio::io` traits as if they implement
                                     // `hyper::rt` IO traits.
                                     let io = TokioIo::new(stream);
@@ -4812,50 +4821,6 @@ impl Machine {
 
 
                         // hyper direct end
-
-                        ////
-                        // // custom server, not using warp (copied from warp)
-                        // let pipeline = false;
-                        // let acceptor = tokio_acceptor;
-                        // let filter = serve;
-
-                        // {
-                        //     use futures_util::future;
-
-                        //     let graceful_util = hyper_util::server::graceful::GracefulShutdown::new();
-                        //     loop {
-                        //         let accept = std::pin::pin!(acceptor.accept());
-                        //         let accepting = match accept.await {
-                        //             Ok(fut) => fut,
-                        //             Err(err) => {
-                        //                 //handle_accept_error(err).await;
-                        //                 continue;
-                        //             }
-                        //         };
-                        //         let svc = warp::service(filter.clone());
-                        //         let watcher = graceful_util.watcher();
-                        //         tokio::spawn(async move {
-                        //             let (io, remote_addr) = accepting;
-                        //             //let svc = (svc, remote_addr);
-                        //             let svc = middleware::RemoteAddrService::new(svc, remote_addr);
-                        //             let svc = hyper_util::service::TowerToHyperService::new(svc);
-                        //             let mut hyper = hyper_util::server::conn::auto::Builder::new(
-                        //                 hyper_util::rt::TokioExecutor::new(),
-                        //             );
-                        //             hyper.http1().pipeline_flush(pipeline);
-                        //             let conn = hyper.serve_connection_with_upgrades(io, svc);
-                        //             let conn = watcher.watch(conn);
-                        //             if let Err(err) = conn.await {
-                        //                 tracing::error!("server connection error: {:?}", err)
-                        //             }
-                        //         });
-                        //     }
-
-                        //     drop(server.acceptor); // close listener
-                        //     graceful_util.shutdown().await;
-                        // }
-
-                        // /// 
 
                         // warp::serve(serve)
                         // .incoming(tokio_acceptor) // no tls
