@@ -29,12 +29,6 @@ use futures_util::future::TryFuture;
 pub fn http_server<Addr>(addr: Addr, shutdown: Arc<Notify>, serve: BoxedFilter<(impl Reply + 'static,)>) -> Result<(), std::io::Error>
 where
     Addr: std::net::ToSocketAddrs
-//    <Serve as warp::filter::FilterBase>::Extract: warp::Reply,
-
-    // <Serve::Future as TryFuture>::Ok: warp::Reply,
-    // Serve: Future + Send + 'static,
-    // Serve::Output: Send + 'static,
-    //<Serve::Future as TryFuture>::Error: warp::reject::IsReject,
 {
     let runtime = tokio::runtime::Handle::current();
     let _guard = runtime.enter();
