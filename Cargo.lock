@@ -2894,6 +2894,7 @@ dependencies = [
  "getrandom 0.2.17",
  "git-version",
  "hostname",
+ "hyper-util",
  "iai-callgrind",
  "indexmap",
  "js-sys",
@@ -3766,8 +3767,6 @@ dependencies = [
 [[package]]
 name = "warp"
 version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0a808122a8a77eecdabaefd88ddb1913c4be5ea1465399f63ba64c7aa705fea"
 dependencies = [
  "bytes",
  "futures-util",

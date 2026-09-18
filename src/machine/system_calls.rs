@@ -4685,11 +4685,16 @@ impl Machine {
 
             match std::net::TcpListener::bind(addr) {
                 Ok(acceptor) => {
+                    use crate::machine::tls;
+
                     let _ = acceptor.set_nonblocking(true);
 
                     //tokio_rustls::
 
                     let tokio_acceptor = tokio::net::TcpListener::from_std(acceptor).expect("TCP socket not async");
+
+                    //warp::ac
+                    //let tls_acceptor = tls::tls::Tls(tokio_acceptor);
 
                     // TODO: to support tls, create a custom class and wrap tokio tcp acceptor with it
                     // this class would accept a connection, do tls on it, and pass it forward
@@ -4698,7 +4703,8 @@ impl Machine {
 
                     runtime.spawn(async move {
                         warp::serve(serve)
-                        .incoming(tokio_acceptor)
+                        //.incoming(tokio_acceptor) // no tls
+                        .incoming(tls_acceptor) // tls
                         .graceful(async move { warp_shutdown_clone.notified().await })
                         .run().await;
                     });
