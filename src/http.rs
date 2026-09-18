@@ -24,6 +24,23 @@ pub struct HttpRequestData {
     pub body: Reader<Bytes>,
 }
 
+// tls
+use tokio_rustls::rustls::ServerConfig;
+use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer};
+
+use tokio_rustls::rustls::pki_types::pem::PemObject;
+use tokio_rustls::TlsAcceptor;
+
+struct Tls {
+    
+}
+
+impl Tls {
+    pub fn init(&mut self, key: String, cert: String) {
+
+    }
+}
+
 pub fn http_server_tls<Addr>(addr: Addr, shutdown: Arc<Notify>, serve: BoxedFilter<(impl Reply + 'static,)>, key: String, cert: String) -> Result<(), std::io::Error>
 where
     Addr: std::net::ToSocketAddrs
@@ -38,11 +55,7 @@ where
             let tokio_acceptor = tokio::net::TcpListener::from_std(acceptor).expect("TCP socket not async");
 
             // tls
-            use tokio_rustls::rustls::ServerConfig;
-            use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer};
 
-            use tokio_rustls::rustls::pki_types::pem::PemObject;
-            use tokio_rustls::TlsAcceptor;
 
             let config = Arc::new(
                     ServerConfig::builder()
@@ -52,7 +65,7 @@ where
                             PrivateKeyDer::from_pem_file(&key).expect("private key"),
                         ).expect("config"),
                 );
-            let acceptor = TlsAcceptor::from(config.clone());
+            let acceptor = TlsAcceptor::from(config);
             // tls end
 
             runtime.spawn(async move {
