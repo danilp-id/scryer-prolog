@@ -4761,33 +4761,54 @@ impl Machine {
                         use tokio::net::TcpListener;
 
                         let listener = tokio_acceptor;
+                        let graceful = hyper_util::server::graceful::GracefulShutdown::new();
+                        let mut signal = std::pin::pin!(async move { warp_shutdown_clone.notified().await });
 
                         // We start a loop to continuously accept incoming connections
                         loop {
-                            let (stream, _) = listener.accept().await.expect("not connected");
-                            let serve = serve.clone();
+                            tokio::select! {
+                                Ok((stream, _addr)) = listener.accept() => {
+                                    let serve = serve.clone();
 
-                            // Use an adapter to access something implementing `tokio::io` traits as if they implement
-                            // `hyper::rt` IO traits.
-                            let io = TokioIo::new(stream);
+                                    // Use an adapter to access something implementing `tokio::io` traits as if they implement
+                                    // `hyper::rt` IO traits.
+                                    let io = TokioIo::new(stream);
 
-                            // Spawn a tokio task to serve multiple connections concurrently
-                            tokio::task::spawn(async move {
-                                // Finally, we bind the incoming connection to our `hello` service
-                                if let Err(err) = http1::Builder::new()
-                                    // `service_fn` converts our function in a `Service`
-                                    .serve_connection(io, hyper_util::service::TowerToHyperService::new(warp::service(serve)))
-                                    //.serve_connection(io, service_fn(async |_: Request<hyper::body::Incoming>| -> Result<Response<Full<Bytes>>, Infallible> {
-                                    //    Ok(Response::new(Full::new(Bytes::from("Hello, World!"))))
-                                    //}))
-                                    .await
-                                {
-                                    eprintln!("Error serving connection: {:?}", err);
+                                    // Spawn a tokio task to serve multiple connections concurrently
+                                    tokio::task::spawn(async move {
+                                        // Finally, we bind the incoming connection to our `hello` service
+                                        if let Err(err) = http1::Builder::new()
+                                            // `service_fn` converts our function in a `Service`
+                                            .serve_connection(io, hyper_util::service::TowerToHyperService::new(warp::service(serve)))
+                                            //.serve_connection(io, service_fn(async |_: Request<hyper::body::Incoming>| -> Result<Response<Full<Bytes>>, Infallible> {
+                                            //    Ok(Response::new(Full::new(Bytes::from("Hello, World!"))))
+                                            //}))
+                                            .await
+                                        {
+                                            eprintln!("Error serving connection: {:?}", err);
+                                        }
+                                    });
+                                },
+                                _ = &mut signal => {
+                                    drop(listener);
+                                    //eprintln!("graceful shutdown signal received");
+                                    // stop the accept loop
+                                    break;
                                 }
-                            });
+                            }
+
+                        //    let (stream, _) = listener.accept().await.expect("not connected");
+                            
                         }
 
-
+                        tokio::select! {
+                            _ = graceful.shutdown() => {
+                                //eprintln!("all connections gracefully closed");
+                            },
+                            _ = tokio::time::sleep(std::time::Duration::from_secs(10)) => {
+                                eprintln!("timed out wait for all connections to close");
+                            }
+                        }
 
 
                         // hyper direct end
