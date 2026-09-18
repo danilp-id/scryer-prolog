@@ -4765,6 +4765,7 @@ impl Machine {
                         // We start a loop to continuously accept incoming connections
                         loop {
                             let (stream, _) = listener.accept().await.expect("not connected");
+                            let serve = serve.clone();
 
                             // Use an adapter to access something implementing `tokio::io` traits as if they implement
                             // `hyper::rt` IO traits.
@@ -4775,9 +4776,10 @@ impl Machine {
                                 // Finally, we bind the incoming connection to our `hello` service
                                 if let Err(err) = http1::Builder::new()
                                     // `service_fn` converts our function in a `Service`
-                                    .serve_connection(io, service_fn(async |_: Request<hyper::body::Incoming>| -> Result<Response<Full<Bytes>>, Infallible> {
-                                        Ok(Response::new(Full::new(Bytes::from("Hello, World!"))))
-                                    }))
+                                    .serve_connection(io, hyper_util::service::TowerToHyperService::new(warp::service(serve)))
+                                    //.serve_connection(io, service_fn(async |_: Request<hyper::body::Incoming>| -> Result<Response<Full<Bytes>>, Infallible> {
+                                    //    Ok(Response::new(Full::new(Bytes::from("Hello, World!"))))
+                                    //}))
                                     .await
                                 {
                                     eprintln!("Error serving connection: {:?}", err);
