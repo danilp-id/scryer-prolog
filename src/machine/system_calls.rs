@@ -101,6 +101,50 @@ use super::libraries;
 use super::preprocessor::to_op_decl;
 use super::preprocessor::to_op_decl_spec;
 
+// tls debug
+#[cfg(feature = "http")]
+mod middleware {
+    use std::net::SocketAddr;
+    use std::task::{Context, Poll};
+    use tower_service::Service;
+
+    //use warp::filters::addr::remote:;
+    //use std::net::SocketAddr;
+
+    #[derive(Clone, Debug)]
+    pub(super) struct RemoteAddrService<S> {
+        inner: S,
+        remote_addr: SocketAddr,
+    }
+
+    impl<S> RemoteAddrService<S> {
+        pub(super) fn new(inner: S, remote_addr: SocketAddr) -> Self {
+            Self { inner, remote_addr }
+        }
+    }
+
+    impl<S, B> Service<http::Request<B>> for RemoteAddrService<S>
+    where
+        S: Service<http::Request<B>>,
+    {
+        type Response = S::Response;
+        type Error = S::Error;
+        type Future = S::Future;
+
+        fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            self.inner.poll_ready(cx)
+        }
+
+        fn call(&mut self, mut req: http::Request<B>) -> Self::Future {
+            let addr = self.remote_addr;
+            req.extensions_mut().insert(addr);
+
+            self.inner.call(req)
+        }
+    }
+}
+// tls debug end
+
 /// Represents the presence (or absence) of a `module:` prefix to predicates, used to
 /// refer to predicates defined in a given `module` that haven't been imported
 /// (through `use_module/1`) or exported.
@@ -4685,7 +4729,7 @@ impl Machine {
 
             match std::net::TcpListener::bind(addr) {
                 Ok(acceptor) => {
-                    use crate::machine::tls;
+                    //use crate::machine::tls;
 
                     let _ = acceptor.set_nonblocking(true);
 
@@ -4693,6 +4737,7 @@ impl Machine {
 
                     let tokio_acceptor = tokio::net::TcpListener::from_std(acceptor).expect("TCP socket not async");
 
+                    //warp::ser
                     //warp::ac
                     //let tls_acceptor = tls::tls::Tls(tokio_acceptor);
 
@@ -4702,11 +4747,98 @@ impl Machine {
                     
 
                     runtime.spawn(async move {
-                        warp::serve(serve)
-                        //.incoming(tokio_acceptor) // no tls
-                        .incoming(tls_acceptor) // tls
-                        .graceful(async move { warp_shutdown_clone.notified().await })
-                        .run().await;
+
+                        // lets use hyper directly!
+                        use std::convert::Infallible;
+                        use std::net::SocketAddr;
+
+                        use http_body_util::Full;
+                        use hyper::body::Bytes;
+                        use hyper::server::conn::http1;
+                        use hyper::service::service_fn;
+                        use hyper::{Request, Response};
+                        use hyper_util::rt::TokioIo;
+                        use tokio::net::TcpListener;
+
+                        let listener = tokio_acceptor;
+
+                        // We start a loop to continuously accept incoming connections
+                        loop {
+                            let (stream, _) = listener.accept().await.expect("not connected");
+
+                            // Use an adapter to access something implementing `tokio::io` traits as if they implement
+                            // `hyper::rt` IO traits.
+                            let io = TokioIo::new(stream);
+
+                            // Spawn a tokio task to serve multiple connections concurrently
+                            tokio::task::spawn(async move {
+                                // Finally, we bind the incoming connection to our `hello` service
+                                if let Err(err) = http1::Builder::new()
+                                    // `service_fn` converts our function in a `Service`
+                                    .serve_connection(io, service_fn(async |_: Request<hyper::body::Incoming>| -> Result<Response<Full<Bytes>>, Infallible> {
+                                        Ok(Response::new(Full::new(Bytes::from("Hello, World!"))))
+                                    }))
+                                    .await
+                                {
+                                    eprintln!("Error serving connection: {:?}", err);
+                                }
+                            });
+                        }
+
+
+
+
+                        // hyper direct end
+
+                        ////
+                        // // custom server, not using warp (copied from warp)
+                        // let pipeline = false;
+                        // let acceptor = tokio_acceptor;
+                        // let filter = serve;
+
+                        // {
+                        //     use futures_util::future;
+
+                        //     let graceful_util = hyper_util::server::graceful::GracefulShutdown::new();
+                        //     loop {
+                        //         let accept = std::pin::pin!(acceptor.accept());
+                        //         let accepting = match accept.await {
+                        //             Ok(fut) => fut,
+                        //             Err(err) => {
+                        //                 //handle_accept_error(err).await;
+                        //                 continue;
+                        //             }
+                        //         };
+                        //         let svc = warp::service(filter.clone());
+                        //         let watcher = graceful_util.watcher();
+                        //         tokio::spawn(async move {
+                        //             let (io, remote_addr) = accepting;
+                        //             //let svc = (svc, remote_addr);
+                        //             let svc = middleware::RemoteAddrService::new(svc, remote_addr);
+                        //             let svc = hyper_util::service::TowerToHyperService::new(svc);
+                        //             let mut hyper = hyper_util::server::conn::auto::Builder::new(
+                        //                 hyper_util::rt::TokioExecutor::new(),
+                        //             );
+                        //             hyper.http1().pipeline_flush(pipeline);
+                        //             let conn = hyper.serve_connection_with_upgrades(io, svc);
+                        //             let conn = watcher.watch(conn);
+                        //             if let Err(err) = conn.await {
+                        //                 tracing::error!("server connection error: {:?}", err)
+                        //             }
+                        //         });
+                        //     }
+
+                        //     drop(server.acceptor); // close listener
+                        //     graceful_util.shutdown().await;
+                        // }
+
+                        // /// 
+
+                        // warp::serve(serve)
+                        // .incoming(tokio_acceptor) // no tls
+                        // //.incoming(tls_acceptor) // tls
+                        // .graceful(async move { warp_shutdown_clone.notified().await })
+                        // .run().await;
                     });
                 }
                 Err(_) => {

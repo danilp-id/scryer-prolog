@@ -11,21 +11,21 @@ pub mod tls {
     //     async fn accept(&mut self) -> Result<Self::Accepting, std::io::Error>;
     // }
 
-    pub struct Tls(pub tokio::net::TcpListener);
+    // pub struct Tls(pub tokio::net::TcpListener);
 
-    impl warp::server::accept::Accept for Tls {
-        type IO = hyper_util::rt::TokioIo<tokio::net::TcpStream>;
-        type AcceptError = std::convert::Infallible;
-        type Accepting =
-            std::future::Ready<Result<(Self::IO, Option<SocketAddr>), Self::AcceptError>>;
-        async fn accept(&mut self) -> Result<Self::Accepting, std::io::Error> {
-            let (io, addr) = <tokio::net::TcpListener>::accept(&self.0).await?;
-            Ok(std::future::ready(Ok((
-                hyper_util::rt::TokioIo::new(io),
-                Some(addr),
-            ))))
-        }
-    }
+    // impl warp::server::accept::Accept for Tls {
+    //     type IO = hyper_util::rt::TokioIo<tokio::net::TcpStream>;
+    //     type AcceptError = std::convert::Infallible;
+    //     type Accepting =
+    //         std::future::Ready<Result<(Self::IO, Option<SocketAddr>), Self::AcceptError>>;
+    //     async fn accept(&mut self) -> Result<Self::Accepting, std::io::Error> {
+    //         let (io, addr) = <tokio::net::TcpListener>::accept(&self.0).await?;
+    //         Ok(std::future::ready(Ok((
+    //             hyper_util::rt::TokioIo::new(io),
+    //             Some(addr),
+    //         ))))
+    //     }
+    // }
 
     // impl<A: Accept> Accept for Tls<A> {
     //     type IO = hyper_util::rt::TokioIo<tokio::net::TcpStream>;
