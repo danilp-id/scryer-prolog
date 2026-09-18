@@ -31,14 +31,16 @@ use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use tokio_rustls::rustls::pki_types::pem::PemObject;
 use tokio_rustls::TlsAcceptor;
 
-struct Tls {
-    
-}
-
-impl Tls {
-    pub fn init(&mut self, key: String, cert: String) {
-
-    }
+pub fn init_tls(key: String, cert: String) -> TlsAcceptor {
+    let config = Arc::new(
+                ServerConfig::builder()
+                    .with_no_client_auth()
+                    .with_single_cert(
+                        CertificateDer::pem_file_iter(&cert).expect("certificate").collect::<Result<_, _>>().expect("certificate loaded"),
+                        PrivateKeyDer::from_pem_file(&key).expect("private key"),
+                    ).expect("config"),
+            );
+    TlsAcceptor::from(config)
 }
 
 pub fn http_server_tls<Addr>(addr: Addr, shutdown: Arc<Notify>, serve: BoxedFilter<(impl Reply + 'static,)>, key: String, cert: String) -> Result<(), std::io::Error>
@@ -54,19 +56,7 @@ where
 
             let tokio_acceptor = tokio::net::TcpListener::from_std(acceptor).expect("TCP socket not async");
 
-            // tls
-
-
-            let config = Arc::new(
-                    ServerConfig::builder()
-                        .with_no_client_auth()
-                        .with_single_cert(
-                            CertificateDer::pem_file_iter(&cert).expect("certificate").collect::<Result<_, _>>().expect("certificate loaded"),
-                            PrivateKeyDer::from_pem_file(&key).expect("private key"),
-                        ).expect("config"),
-                );
-            let acceptor = TlsAcceptor::from(config);
-            // tls end
+            let tls_acceptor = init_tls(key, cert); // tls
 
             runtime.spawn(async move {
                 use hyper::server::conn::http1;
@@ -82,8 +72,9 @@ where
                         Ok((stream, _addr)) = listener.accept() => {
                             let serve = serve.clone();
 
+                            // tls
                             // TODO: can speedup initialization step, see https://github.com/rustls/tokio-rustls/blob/HEAD/examples/server.rs#L63
-                            let stream = acceptor.accept(stream).await;
+                            let stream = tls_acceptor.accept(stream).await;
 
                             if let Err(err) = stream {
                                 eprintln!("Error initializing TLS connection: {:?}", err);
