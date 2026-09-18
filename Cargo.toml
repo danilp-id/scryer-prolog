@@ -100,6 +100,7 @@ serde_json = "1.0.122"
 serde = "1.0.204"
 parking_lot = "0.12.4"
 tokio-rustls = "0.26.5"
+tokio-util = "0.7.19"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 crossterm = { version = "0.28.1", optional = true }

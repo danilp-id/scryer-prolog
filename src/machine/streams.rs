@@ -16,8 +16,6 @@ pub use modular_bitfield::prelude::*;
 
 #[cfg(feature = "http")]
 use bytes::{Buf, Bytes, buf::Reader as BufReader};
-#[cfg(feature = "http")]
-use warp::reply::Reply;
 use std::cmp::Ordering;
 use std::error::Error;
 use std::fmt;

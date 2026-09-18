@@ -101,50 +101,6 @@ use super::libraries;
 use super::preprocessor::to_op_decl;
 use super::preprocessor::to_op_decl_spec;
 
-// tls debug
-#[cfg(feature = "http")]
-mod middleware {
-    use std::net::SocketAddr;
-    use std::task::{Context, Poll};
-    use tower_service::Service;
-
-    //use warp::filters::addr::remote:;
-    //use std::net::SocketAddr;
-
-    #[derive(Clone, Debug)]
-    pub(super) struct RemoteAddrService<S> {
-        inner: S,
-        remote_addr: SocketAddr,
-    }
-
-    impl<S> RemoteAddrService<S> {
-        pub(super) fn new(inner: S, remote_addr: SocketAddr) -> Self {
-            Self { inner, remote_addr }
-        }
-    }
-
-    impl<S, B> Service<http::Request<B>> for RemoteAddrService<S>
-    where
-        S: Service<http::Request<B>>,
-    {
-        type Response = S::Response;
-        type Error = S::Error;
-        type Future = S::Future;
-
-        fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-            self.inner.poll_ready(cx)
-        }
-
-        fn call(&mut self, mut req: http::Request<B>) -> Self::Future {
-            let addr = self.remote_addr;
-            req.extensions_mut().insert(addr);
-
-            self.inner.call(req)
-        }
-    }
-}
-// tls debug end
-
 /// Represents the presence (or absence) of a `module:` prefix to predicates, used to
 /// refer to predicates defined in a given `module` that haven't been imported
 /// (through `use_module/1`) or exported.
@@ -4623,8 +4579,6 @@ impl Machine {
         };
 
         if let Some(address_str) = self.machine_st.value_to_str_like(address_sink) {
-            use futures::FutureExt;
-
             let address_string = address_str.as_str();
             let addr: SocketAddr = match address_string
                 .to_socket_addrs()
@@ -4707,10 +4661,7 @@ impl Machine {
 
             let warp_shutdown_clone = warp_shutdown.clone();
 
-            let server =  match ssl_server {
-                 Some((key, cert)) => crate::http::http_server_tls(addr, warp_shutdown_clone, serve, key, cert),
-                 None => crate::http::http_server(addr, warp_shutdown_clone, serve),
-            };
+            let server = crate::http::http_server(addr, warp_shutdown_clone, serve, ssl_server);
 
             if let Err(_) = server {
                 self.machine_st.fail = true;
