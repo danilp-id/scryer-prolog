@@ -102,6 +102,7 @@ Some things that are still missing:
 :- use_module(library(lists)).
 :- use_module(library(pio)).
 :- use_module(library(time)).
+:- use_module(library(reif)).
 
 %% http_listen(+Port, +Handlers).
 %
@@ -156,7 +157,8 @@ http_listen_(Port, Handlers, Options) :-
     setup_call_cleanup(
         (
             http_listen__(Addr, HttpListener, TLSKey, TLSCert, ContentLengthLimit),
-            format("Listening at http://~s\n", [Addr])
+            if_(TLSKey = "", Proto = "http", Proto = "https"),
+            format("Listening at ~s://~s\n", [Proto, Addr])
         ),
         http_loop(HttpListener, Handlers, InitialState, CatchErrors),
         http_listen_stop_(HttpListener)
