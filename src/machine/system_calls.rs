@@ -4705,29 +4705,13 @@ impl Machine {
                     },
                 ).boxed();
 
-            
-            // TODO: support tls, can use warp_openssl
-            // let bound = match ssl_server {
-            //     Some((key, cert)) => warp::serve(serve)
-            //         .tls()
-            //         .key(key)
-            //         .cert(cert)
-            //         .try_bind_with_graceful_shutdown(addr, async move {
-            //             warp_shutdown_clone.notified().await;
-            //         })
-            //         .map(|(_addr, server)| runtime.spawn(server)),
-            //     None => warp::serve(serve)
-            //         .try_bind_with_graceful_shutdown(addr, async move {
-            //             warp_shutdown_clone.notified().await;
-            //         })
-            //         .map(|(_addr, server)| runtime.spawn(server)),
-            // };
-
-            //warp::
-
             let warp_shutdown_clone = warp_shutdown.clone();
 
-            let server = crate::http::http_server(addr, warp_shutdown_clone, serve);
+            let server =  match ssl_server {
+                 Some((key, cert)) => crate::http::http_server_tls(addr, warp_shutdown_clone, serve, key, cert),
+                 None => crate::http::http_server(addr, warp_shutdown_clone, serve),
+            };
+
             if let Err(_) = server {
                 self.machine_st.fail = true;
                 return Ok(()); // TODO: produce an exception instead of silently failing
